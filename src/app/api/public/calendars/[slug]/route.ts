@@ -20,7 +20,8 @@ export async function GET(
   }
 
   const timezone = resolved.calendar.timezone;
-  const days = Math.min(Math.max(Number(daysParam ?? "7") || 7, 1), 31);
+  // 月カレンダーは最大 6 週 = 42 日分を一度に取得する
+  const days = Math.min(Math.max(Number(daysParam ?? "7") || 7, 1), 42);
 
   let fromKey: string;
   if (fromParam) {

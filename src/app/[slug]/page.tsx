@@ -1,7 +1,9 @@
 import { PublicBookingPage } from "@/components/public-booking-page";
+import { resolvePublicSlug } from "@/lib/delivery-link";
 import { isReservedSlug } from "@/lib/utils";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 
 function getJstDayFaviconPath(date = new Date()): string {
   const day = Number(
@@ -14,11 +16,32 @@ function getJstDayFaviconPath(date = new Date()): string {
   return `/favicons/${safeDay}.ico`;
 }
 
-export function generateMetadata(): Metadata {
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const icons = { icon: getJstDayFaviconPath() };
+
+  if (isReservedSlug(slug)) {
+    return { icons };
+  }
+
+  const resolved = await resolvePublicSlug(slug);
+  if (!resolved) {
+    return { icons };
+  }
+
+  const name =
+    resolved.calendar.user.name?.trim() ||
+    resolved.calendar.user.email.split("@")[0] ||
+    "担当者";
+  const duration = resolved.calendar.durationMinutes;
+
   return {
-    icons: {
-      icon: getJstDayFaviconPath(),
-    },
+    title: `${name} と ${duration} 分間の予定`,
+    icons,
   };
 }
 
@@ -35,7 +58,9 @@ export default async function PublicCalendarRoute({
 
   return (
     <main className="min-h-screen w-full bg-white px-4 pt-3 pb-6 sm:px-8 sm:pt-6 sm:pb-10">
-      <PublicBookingPage slug={slug} />
+      <Suspense fallback={<p className="py-16 text-center text-sm text-gray-500">読み込み中...</p>}>
+        <PublicBookingPage slug={slug} />
+      </Suspense>
     </main>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   addDaysToDateKey,
   formatTime,
@@ -40,18 +41,54 @@ interface CalendarInfo {
 const WEEKDAY_SHORT = ["日", "月", "火", "水", "木", "金", "土"] as const;
 const VISIBLE_DAYS = 7;
 
+function monthGridRange(
+  year: number,
+  month: number,
+  timezone: string
+): { from: string; days: number } | null {
+  const cells = getMonthGrid(year, month);
+  const from = cells[0]?.dateKey;
+  const to = cells[cells.length - 1]?.dateKey;
+  if (!from || !to) return null;
+
+  const fromDate = parseDateKey(from, timezone);
+  const toDate = parseDateKey(to, timezone);
+  const days =
+    Math.round((toDate.getTime() - fromDate.getTime()) / 86400000) + 1;
+  return { from, days };
+}
+
+function availableDatesFromSlots(slotsByDate: Record<string, Slot[]>): string[] {
+  const available: string[] = [];
+  for (const [dateKey, slots] of Object.entries(slotsByDate)) {
+    if (slots.length > 0) available.push(dateKey);
+  }
+  return available;
+}
+
 export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const previewConfirmed = searchParams.get("preview") === "confirmed";
+
   const [calendar, setCalendar] = useState<CalendarInfo | null>(null);
-  const [weekSlotsByDate, setWeekSlotsByDate] = useState<Record<string, Slot[]>>({});
+  const [slotsByDateCache, setSlotsByDateCache] = useState<Record<string, Slot[]>>({});
+  const slotsByDateCacheRef = useRef<Record<string, Slot[]>>({});
   const [monthAvailability, setMonthAvailability] = useState<Set<string>>(new Set());
   const [monthAvailabilityKey, setMonthAvailabilityKey] = useState<string | null>(null);
   const monthAvailabilityCacheRef = useRef<Record<string, string[]>>({});
   const activeMonthKeyRef = useRef<string | null>(null);
+  const pendingRangeFetchesRef = useRef<Set<string>>(new Set());
   const [viewStartDate, setViewStartDate] = useState<string>("");
   const [displayMonth, setDisplayMonth] = useState<{ year: number; month: number } | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
+  const [confirmedBooking, setConfirmedBooking] = useState<{
+    slot: Slot;
+    email: string;
+  } | null>(null);
+  const [previewDismissed, setPreviewDismissed] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [weekLoading, setWeekLoading] = useState(false);
   const [step, setStep] = useState<"select" | "done">("select");
   const [form, setForm] = useState<BookingForm>({
     guestCompany: "",
@@ -61,9 +98,16 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const skipWeekFetchRef = useRef(true);
 
   const timezone = calendar?.timezone ?? "Asia/Tokyo";
+
+  const mergeSlotsCache = useCallback((incoming: Record<string, Slot[]>) => {
+    slotsByDateCacheRef.current = {
+      ...slotsByDateCacheRef.current,
+      ...incoming,
+    };
+    setSlotsByDateCache(slotsByDateCacheRef.current);
+  }, []);
 
   const fetchSlots = useCallback(
     async (from: string, days: number) => {
@@ -81,20 +125,39 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
     [slug]
   );
 
+  const applyMonthAvailability = useCallback(
+    (monthKey: string, slotsByDate: Record<string, Slot[]>) => {
+      const available = availableDatesFromSlots(slotsByDate);
+      monthAvailabilityCacheRef.current[monthKey] = available;
+      if (activeMonthKeyRef.current === monthKey) {
+        setMonthAvailability(new Set(available));
+        setMonthAvailabilityKey(monthKey);
+      }
+    },
+    []
+  );
+
   useEffect(() => {
     async function loadInitial() {
       setInitialLoading(true);
       setError(null);
       try {
         const today = todayDateKey("Asia/Tokyo");
-        const data = await fetchSlots(today, VISIBLE_DAYS);
-        setCalendar(data.calendar);
-        setWeekSlotsByDate(data.slotsByDate);
-        setViewStartDate(today);
-        skipWeekFetchRef.current = true;
-
         const now = new Date();
-        setDisplayMonth({ year: now.getFullYear(), month: now.getMonth() + 1 });
+        const year = now.getFullYear();
+        const month = now.getMonth() + 1;
+        const monthKey = `${year}-${month}`;
+        const range = monthGridRange(year, month, "Asia/Tokyo");
+        if (!range) throw new Error("カレンダーの初期化に失敗しました");
+
+        activeMonthKeyRef.current = monthKey;
+        const data = await fetchSlots(range.from, range.days);
+
+        mergeSlotsCache(data.slotsByDate);
+        applyMonthAvailability(monthKey, data.slotsByDate);
+        setCalendar(data.calendar);
+        setViewStartDate(today);
+        setDisplayMonth({ year, month });
 
         if (data.prefilledCompany) {
           setForm((prev) => ({
@@ -109,31 +172,7 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
       }
     }
     loadInitial();
-  }, [fetchSlots]);
-
-  useEffect(() => {
-    if (!viewStartDate || initialLoading) return;
-    if (skipWeekFetchRef.current) {
-      skipWeekFetchRef.current = false;
-      return;
-    }
-
-    async function loadWeek() {
-      setWeekLoading(true);
-      setError(null);
-      try {
-        const data = await fetchSlots(viewStartDate, VISIBLE_DAYS);
-        setCalendar(data.calendar);
-        setWeekSlotsByDate(data.slotsByDate);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "読み込みに失敗しました");
-      } finally {
-        setWeekLoading(false);
-      }
-    }
-
-    loadWeek();
-  }, [viewStartDate, fetchSlots, initialLoading]);
+  }, [fetchSlots, mergeSlotsCache, applyMonthAvailability]);
 
   useEffect(() => {
     if (!displayMonth || !calendar) return;
@@ -152,35 +191,42 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
     setMonthAvailability(new Set());
     setMonthAvailabilityKey(null);
 
+    const range = monthGridRange(month.year, month.month, timezone);
+    if (!range) return;
+
+    const fetchKey = `month:${range.from}:${range.days}`;
+    if (pendingRangeFetchesRef.current.has(fetchKey)) return;
+    pendingRangeFetchesRef.current.add(fetchKey);
+
+    let cancelled = false;
+
     async function loadMonthAvailability() {
-      const cells = getMonthGrid(month.year, month.month);
-      const from = cells[0]?.dateKey;
-      const to = cells[cells.length - 1]?.dateKey;
-      if (!from || !to) return;
-
-      const fromDate = parseDateKey(from, timezone);
-      const toDate = parseDateKey(to, timezone);
-      const days =
-        Math.round((toDate.getTime() - fromDate.getTime()) / 86400000) + 1;
-
       try {
-        const data = await fetchSlots(from, days);
-        if (activeMonthKeyRef.current !== monthKey) return;
+        const data = await fetchSlots(range!.from, range!.days);
+        if (cancelled || activeMonthKeyRef.current !== monthKey) return;
 
-        const available: string[] = [];
-        for (const [dateKey, slots] of Object.entries(data.slotsByDate)) {
-          if (slots.length > 0) available.push(dateKey);
-        }
-        monthAvailabilityCacheRef.current[monthKey] = available;
-        setMonthAvailability(new Set(available));
-        setMonthAvailabilityKey(monthKey);
+        mergeSlotsCache(data.slotsByDate);
+        applyMonthAvailability(monthKey, data.slotsByDate);
+        setCalendar(data.calendar);
       } catch {
         // 月表示のハイライト失敗は致命的ではない
+      } finally {
+        pendingRangeFetchesRef.current.delete(fetchKey);
       }
     }
 
     loadMonthAvailability();
-  }, [displayMonth, calendar, fetchSlots, timezone]);
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    displayMonth,
+    calendar,
+    fetchSlots,
+    timezone,
+    mergeSlotsCache,
+    applyMonthAvailability,
+  ]);
 
   const visibleDates = useMemo(() => {
     if (!viewStartDate) return [];
@@ -188,6 +234,57 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
       addDaysToDateKey(viewStartDate, index, timezone)
     );
   }, [viewStartDate, timezone]);
+
+  // 表示中の7日に未キャッシュがあれば裏で取得（UIは差し替えない）
+  useEffect(() => {
+    if (!viewStartDate || initialLoading || !calendar) return;
+
+    const missing = visibleDates.filter(
+      (dateKey) => !(dateKey in slotsByDateCacheRef.current)
+    );
+    if (missing.length === 0) return;
+
+    const fetchKey = `week:${viewStartDate}:${VISIBLE_DAYS}`;
+    if (pendingRangeFetchesRef.current.has(fetchKey)) return;
+    pendingRangeFetchesRef.current.add(fetchKey);
+
+    let cancelled = false;
+
+    async function fillMissingWeek() {
+      try {
+        const data = await fetchSlots(viewStartDate, VISIBLE_DAYS);
+        if (cancelled) return;
+        mergeSlotsCache(data.slotsByDate);
+        setCalendar(data.calendar);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "読み込みに失敗しました");
+        }
+      } finally {
+        pendingRangeFetchesRef.current.delete(fetchKey);
+      }
+    }
+
+    fillMissingWeek();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    viewStartDate,
+    visibleDates,
+    initialLoading,
+    calendar,
+    fetchSlots,
+    mergeSlotsCache,
+  ]);
+
+  const weekSlotsByDate = useMemo(() => {
+    const result: Record<string, Slot[]> = {};
+    for (const dateKey of visibleDates) {
+      result[dateKey] = slotsByDateCache[dateKey] ?? [];
+    }
+    return result;
+  }, [visibleDates, slotsByDateCache]);
 
   const maxSlotCount = useMemo(() => {
     return Math.max(
@@ -215,6 +312,10 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
       setError("電話番号を入力してください");
       return;
     }
+    if (!/^[\d-]+$/.test(guestPhone) || !/\d/.test(guestPhone)) {
+      setError("電話番号は数字で入力してください");
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -236,6 +337,10 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "予約に失敗しました");
+      setConfirmedBooking({
+        slot: selectedSlot,
+        email: form.guestEmail.trim(),
+      });
       setSelectedSlot(null);
       setStep("done");
     } catch (err) {
@@ -250,13 +355,45 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
     setError(null);
   }, []);
 
+  const closeConfirmedModal = useCallback(() => {
+    setPreviewDismissed(true);
+    setConfirmedBooking(null);
+    setStep("select");
+    setError(null);
+    if (previewConfirmed) {
+      router.replace(pathname);
+    }
+  }, [previewConfirmed, router, pathname]);
+
+  useEffect(() => {
+    if (!previewConfirmed) {
+      setPreviewDismissed(false);
+      return;
+    }
+    if (!calendar || previewDismissed || confirmedBooking) return;
+
+    const start = new Date();
+    start.setSeconds(0, 0);
+    start.setMinutes(0);
+    start.setHours(start.getHours() + 1);
+    const end = new Date(start.getTime() + calendar.durationMinutes * 60_000);
+
+    setConfirmedBooking({
+      slot: {
+        start: start.toISOString(),
+        end: end.toISOString(),
+      },
+      email: "preview@example.com",
+    });
+    setStep("done");
+  }, [previewConfirmed, calendar, previewDismissed, confirmedBooking]);
+
   function isDateSelectable(dateKey: string): boolean {
     const today = todayDateKey(timezone);
     return dateKey >= today && dateKey <= bookingWindowEnd;
   }
 
   function handleSelectDate(dateKey: string) {
-    if (!isDateSelectable(dateKey)) return;
     setViewStartDate(dateKey);
   }
 
@@ -284,15 +421,6 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
 
   if (error && !calendar) {
     return <p className="py-16 text-center text-sm text-red-600">{error}</p>;
-  }
-
-  if (step === "done") {
-    return (
-      <div className="space-y-3 py-16 text-center">
-        <h2 className="text-2xl font-normal text-gray-900">予約が完了しました</h2>
-        <p className="text-sm text-gray-600">確認メールをお送りしました（Phase 2 で実装予定）。</p>
-      </div>
-    );
   }
 
   const creatorLabel = calendar?.ownerName ?? "担当者";
@@ -334,7 +462,7 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
         </div>
       </header>
 
-      {step === "select" && (
+      {(step === "select" || step === "done") && (
         <section className="overflow-visible rounded-lg border border-[var(--gm3-sys-color-outline-variant)] px-5 py-6 sm:px-8 sm:py-8">
           <div className="mb-6 flex items-start justify-between gap-4">
             <h2 className="text-base font-normal text-[#1f1f1f]">予約時間を選択</h2>
@@ -359,27 +487,23 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
             )}
 
             <div className="min-w-0 flex-1 overflow-visible">
-              {weekLoading ? (
-                <p className="py-12 text-center text-sm text-gray-500">読み込み中...</p>
-              ) : (
-                <WeekSlotGrid
-                  dates={visibleDates}
-                  slotsByDate={weekSlotsByDate}
-                  timezone={timezone}
-                  maxRows={maxSlotCount}
-                  canGoPrev={viewStartDate > todayDateKey(timezone)}
-                  canGoNext={
-                    addDaysToDateKey(viewStartDate, VISIBLE_DAYS - 1, timezone) <
-                    bookingWindowEnd
-                  }
-                  onPrevWeek={() => shiftWeek(-1)}
-                  onNextWeek={() => shiftWeek(1)}
-                  onSelectSlot={(slot) => {
-                    setSelectedSlot(slot);
-                    setError(null);
-                  }}
-                />
-              )}
+              <WeekSlotGrid
+                dates={visibleDates}
+                slotsByDate={weekSlotsByDate}
+                timezone={timezone}
+                maxRows={maxSlotCount}
+                canGoPrev={viewStartDate > todayDateKey(timezone)}
+                canGoNext={
+                  addDaysToDateKey(viewStartDate, VISIBLE_DAYS - 1, timezone) <
+                  bookingWindowEnd
+                }
+                onPrevWeek={() => shiftWeek(-1)}
+                onNextWeek={() => shiftWeek(1)}
+                onSelectSlot={(slot) => {
+                  setSelectedSlot(slot);
+                  setError(null);
+                }}
+              />
 
               {error && !selectedSlot && (
                 <p className="mt-4 text-sm text-red-600">{error}</p>
@@ -389,7 +513,7 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
         </section>
       )}
 
-      {selectedSlot && calendar && (
+      {selectedSlot && calendar && step === "select" && (
         <BookingModal
           calendar={calendar}
           slot={selectedSlot}
@@ -401,6 +525,17 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
           onChangeForm={setForm}
           onClose={closeBookingModal}
           onSubmit={handleSubmit}
+        />
+      )}
+
+      {step === "done" && confirmedBooking && calendar && (
+        <BookingConfirmedModal
+          calendar={calendar}
+          slot={confirmedBooking.slot}
+          email={confirmedBooking.email}
+          timezone={timezone}
+          creatorLabel={creatorLabel}
+          onClose={closeConfirmedModal}
         />
       )}
     </div>
@@ -521,8 +656,20 @@ function BookingModal({
             <BookingField
               label="電話番号"
               type="tel"
+              inputMode="numeric"
+              pattern="[0-9-]*"
               value={form.guestPhone}
-              onChange={(guestPhone) => onChangeForm({ ...form, guestPhone })}
+              onChange={(guestPhone) =>
+                onChangeForm({
+                  ...form,
+                  guestPhone: guestPhone
+                    .replace(/[０-９]/g, (char) =>
+                      String.fromCharCode(char.charCodeAt(0) - 0xfee0)
+                    )
+                    .replace(/[－ー−‐]/g, "-")
+                    .replace(/[^\d-]/g, ""),
+                })
+              }
               autoComplete="tel"
               required
             />
@@ -549,12 +696,134 @@ function BookingModal({
             <button
               type="submit"
               disabled={submitting}
-              className="cursor-pointer rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-white hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
+              aria-label={submitting ? "予約処理中" : "予約"}
+              className="inline-flex h-10 min-w-[88px] cursor-pointer items-center justify-center rounded-full bg-primary px-6 text-sm font-medium text-white hover:bg-primary-hover disabled:cursor-not-allowed transition-colors"
             >
-              {submitting ? "予約中..." : "予約"}
+              {submitting ? <BookingSpinner /> : "予約"}
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function BookingConfirmedModal({
+  calendar,
+  slot,
+  email,
+  timezone,
+  creatorLabel,
+  onClose,
+}: {
+  calendar: CalendarInfo;
+  slot: Slot;
+  email: string;
+  timezone: string;
+  creatorLabel: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
+  const startDate = new Date(slot.start);
+  const month = new Intl.DateTimeFormat("en-US", {
+    month: "numeric",
+    timeZone: timezone,
+  }).format(startDate);
+  const day = new Intl.DateTimeFormat("en-US", {
+    day: "numeric",
+    timeZone: timezone,
+  }).format(startDate);
+  const weekday = new Intl.DateTimeFormat("ja-JP", {
+    weekday: "long",
+    timeZone: timezone,
+  }).format(startDate);
+
+  return (
+    <div
+      className="booking-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="booking-confirmed-title"
+        className="booking-modal-panel w-full max-w-[460px] rounded-[28px] bg-white shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="px-8 pt-10 pb-6 text-center">
+          <div className="mx-auto mb-5 flex h-[66px] w-[66px] items-center justify-center rounded-full border border-[#dadce0]">
+            <ConfirmedCheckIcon />
+          </div>
+          <h2
+            id="booking-confirmed-title"
+            className="text-[1.375rem] font-normal leading-snug text-[#1f1f1f]"
+          >
+            予約が確定しました
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-[#444746]">
+            確認メールを以下のメールアドレス宛に送信しました。
+          </p>
+          <p className="mt-1 text-sm font-medium text-[#1f1f1f]">{email}</p>
+        </div>
+
+        <div className="mx-8 h-px bg-[#e0e0e0]" />
+
+        <div className="flex items-start gap-5 px-8 py-6">
+          <div className="w-12 shrink-0 text-center">
+            <p className="text-[1.75rem] font-normal leading-none text-[#1f1f1f]">{day}</p>
+            <p className="mt-1 text-xs text-[#444746]">{month}月</p>
+          </div>
+          <div className="min-w-0 pt-0.5">
+            <p className="text-sm font-medium leading-5 text-[#1f1f1f]">
+              {creatorLabel} と {calendar.durationMinutes} 分間の予定
+            </p>
+            <p className="mt-1 text-sm leading-5 text-[#444746]">
+              {weekday} ・ {formatTime(slot.start, timezone)}～
+              {formatTime(slot.end, timezone)}
+            </p>
+            <p className="mt-1 text-sm leading-5 text-[#444746]">
+              {formatTimezoneLabel(timezone)}
+            </p>
+          </div>
+        </div>
+
+        <div className="mx-8 h-px bg-[#e0e0e0]" />
+
+        <div className="px-8 py-5">
+          <p className="text-center text-sm leading-6 text-[#444746]">
+            変更が必要な場合は、
+            <br />
+            <button
+              type="button"
+              className="cursor-pointer text-primary hover:underline"
+              onClick={() => {
+                // Phase 2: キャンセルフロー
+              }}
+            >
+              予約をキャンセルしてください
+            </button>
+          </p>
+        </div>
+
+        <div className="flex justify-end px-6 pb-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer rounded-full px-4 py-2 text-sm font-medium text-primary hover:bg-[#ECF1FC] transition-colors"
+          >
+            閉じる
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -565,6 +834,8 @@ function BookingField({
   value,
   onChange,
   type = "text",
+  inputMode,
+  pattern,
   autoComplete,
   required = false,
 }: {
@@ -572,6 +843,8 @@ function BookingField({
   value: string;
   onChange: (value: string) => void;
   type?: string;
+  inputMode?: "numeric" | "tel" | "text" | "email";
+  pattern?: string;
   autoComplete?: string;
   required?: boolean;
 }) {
@@ -590,6 +863,8 @@ function BookingField({
         type={type}
         value={value}
         required={required}
+        inputMode={inputMode}
+        pattern={pattern}
         autoComplete={autoComplete}
         onChange={(event) => onChange(event.target.value)}
         className="w-full rounded-lg border border-[#747775] bg-white px-3 py-2.5 text-sm text-[#1f1f1f] shadow-none outline-none ring-0 transition-[border-color,box-shadow] focus:border-[#0b57d0] focus:shadow-[inset_0_0_0_2px_#0b57d0] focus:outline-none focus:ring-0"
@@ -645,9 +920,10 @@ function MiniCalendar({
   const monthLabel = `${displayMonth.year}年 ${displayMonth.month}月`;
 
   const cells = getMonthGrid(displayMonth.year, displayMonth.month);
-  const daysInMonth = new Date(displayMonth.year, displayMonth.month, 0).getDate();
-  const monthEnd = `${displayMonth.year}-${String(displayMonth.month).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
-  const canGoNext = monthEnd < bookingWindowEnd;
+  // 翌月1日が受付期間内なら進める（月末が期間外でも月初が有効なら表示する）
+  const nextMonthDate = new Date(displayMonth.year, displayMonth.month, 1);
+  const nextMonthStart = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, "0")}-01`;
+  const canGoNext = nextMonthStart <= bookingWindowEnd;
 
   return (
     <div className="w-[230px] shrink-0">
@@ -696,15 +972,14 @@ function MiniCalendar({
             <div key={cell.dateKey} className="flex h-6 items-center justify-center">
               <button
                 type="button"
-                disabled={isUnavailable}
                 onClick={() => onSelectDate(cell.dateKey)}
-                className={`relative flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-normal leading-none ${
+                className={`relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-[10px] font-normal leading-none ${
                   isSelected
                     ? "bg-[var(--gm3-sys-color-primary)] text-white"
                     : isBookable
-                      ? "bg-[var(--gm3-sys-color-primary-container)] text-[#1f1f1f] hover:bg-[#b8deff]"
+                      ? "bg-[var(--gm3-sys-color-primary-container)] text-[#1f1f1f] hover:bg-[#B1D8EF]"
                       : isUnavailable
-                        ? "cursor-default text-[#1f1f1f]"
+                        ? "text-[#1f1f1f] hover:bg-[#ECEDEF]"
                         : "text-[#1f1f1f] hover:bg-gray-100"
                 }`}
               >
@@ -838,6 +1113,38 @@ function ClockIcon() {
         d="M8 5v3l2 1.5"
         stroke="currentColor"
         strokeWidth="1.25"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ConfirmedCheckIcon() {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/check.webp"
+      alt=""
+      width={35}
+      height={35}
+      className="h-[35px] w-[35px] object-contain"
+      aria-hidden
+    />
+  );
+}
+
+function BookingSpinner() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="h-5 w-5 animate-spin text-white"
+      fill="none"
+      aria-hidden
+    >
+      <path
+        d="M12 3a9 9 0 1 1-9 9"
+        stroke="currentColor"
+        strokeWidth="3"
         strokeLinecap="round"
       />
     </svg>
