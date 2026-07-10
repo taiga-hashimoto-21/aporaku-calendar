@@ -33,14 +33,21 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
-/* sonner: 右から入って右へ消える + 幅300px固定 */
+/* sonner: 右から入って右へ消える + 文言幅にフィット（1行） */
 [data-sonner-toaster].app-toaster {
-  width: 300px !important;
-  --width: 300px !important;
+  width: auto !important;
+  --width: auto !important;
 }
 
 [data-sonner-toaster].app-toaster [data-sonner-toast][data-styled="true"] {
-  width: 300px !important;
+  width: auto !important;
+  min-width: fit-content !important;
+  max-width: max-content !important;
+  white-space: nowrap !important;
+}
+
+[data-sonner-toaster].app-toaster [data-sonner-toast][data-styled="true"] [data-title] {
+  white-space: nowrap !important;
 }
 
 [data-sonner-toaster].app-toaster[data-x-position="right"]

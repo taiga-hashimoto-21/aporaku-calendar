@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ensureCurrentTeam } from "@/lib/team";
 import { buildPublicCalendarUrl } from "@/lib/utils";
 import {
   AccountSettingsSection,
@@ -10,6 +11,8 @@ import {
 export default async function AccountCalendarPage() {
   const session = await auth();
   if (!session?.user?.id) return null;
+
+  const currentTeam = await ensureCurrentTeam(session.user.id);
 
   const [googleAccount, googleConnection, calendars] = await Promise.all([
     prisma.account.findFirst({
@@ -21,7 +24,7 @@ export default async function AccountCalendarPage() {
       select: { calendarId: true },
     }),
     prisma.schedulingCalendar.findMany({
-      where: { userId: session.user.id },
+      where: { teamId: currentTeam.id },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,

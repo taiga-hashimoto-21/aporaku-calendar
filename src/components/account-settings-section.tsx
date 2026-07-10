@@ -1,15 +1,30 @@
 type AccountSettingsSectionProps = {
   title: string;
+  action?: React.ReactNode;
   children: React.ReactNode;
+  /** true のとき白い1枚カードで包まない（複数カードを並べる用） */
+  unboxed?: boolean;
 };
 
-export function AccountSettingsSection({ title, children }: AccountSettingsSectionProps) {
+export function AccountSettingsSection({
+  title,
+  action,
+  children,
+  unboxed = false,
+}: AccountSettingsSectionProps) {
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-      <div className="rounded-lg bg-white p-6">{children}</div>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
+        {action}
+      </div>
+      {unboxed ? children : <div className="rounded-lg bg-white p-6">{children}</div>}
     </div>
   );
+}
+
+export function SettingsCard({ children }: { children: React.ReactNode }) {
+  return <div className="rounded-lg bg-white p-6">{children}</div>;
 }
 
 export function StatusBadge({ connected, label }: { connected: boolean; label?: string }) {

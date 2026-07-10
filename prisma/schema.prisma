@@ -17,7 +17,10 @@ model User {
   email         String    @unique
   emailVerified DateTime?
   image         String?
+  /// 個人チームの slug と同期（後方互換）
   teamSlug      String    @unique
+  /// ヘッダーで選択中のチーム
+  currentTeamId String?
   /// アポラク User.id（連携時に設定。配信リンクのデフォルトカレンダー解決に使用）
   aporakuUserId String?   @unique
   timezone      String    @default("Asia/Tokyo")
@@ -27,9 +30,13 @@ model User {
   accounts            Account[]
   sessions            Session[]
   calendars           SchedulingCalendar[]
+  calendarParticipations CalendarParticipant[]
   googleConnection    GoogleConnection?
   zoomConnection      ZoomConnection?
   webhookEndpoints    WebhookEndpoint[]
+  ownedTeams          Team[]            @relation("TeamOwner")
+  teamMemberships     TeamMember[]
+  currentTeam         Team?             @relation("UserCurrentTeam", fields: [currentTeamId], references: [id], onDelete: SetNull)
 }
 
 model Account {
@@ -98,6 +105,51 @@ model ZoomConnection {
 }
 
 // ---------------------------------------------------------------------------
+// チーム
+// ---------------------------------------------------------------------------
+
+enum TeamMemberRole {
+  owner
+  member
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  /// URL / 識別用（User.teamSlug と個人チームでは同期）
+  slug        String   @unique
+  ownerUserId String
+  /// 招待リンク用（/team/{invitePublicId}/invite/{inviteToken}）
+  invitePublicId  String?   @unique
+  inviteToken     String?   @unique
+  inviteCreatedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner         User                 @relation("TeamOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  members       TeamMember[]
+  currentUsers  User[]               @relation("UserCurrentTeam")
+  calendars     SchedulingCalendar[]
+
+  @@index([ownerUserId])
+}
+
+model TeamMember {
+  id        String         @id @default(cuid())
+  teamId    String
+  userId    String
+  role      TeamMemberRole @default(member)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
 // 日程調整カレンダー
 // ---------------------------------------------------------------------------
 
@@ -107,9 +159,17 @@ enum MeetingType {
   google_meet
 }
 
+enum ParticipationMode {
+  all
+  any
+  two_groups
+}
+
 model SchedulingCalendar {
   id                  String      @id @default(cuid())
   userId              String
+  /// 所属チーム（ダッシュボード表示・管理の単位）
+  teamId              String
   /// 公開 URL 用 ID（全体で一意）。例: FW4awsNdUMWJ2xvn7
   slug                String      @unique
   name                String
@@ -129,6 +189,8 @@ model SchedulingCalendar {
   /// [{ "date": "2026-07-10", "slots": [{ "start": "10:00", "end": "12:00" }] }]
   dateOverrides       Json        @default("[]")
   meetingType         MeetingType @default(none)
+  /// 参加メンバーの空き判定方式
+  participationMode   ParticipationMode @default(all)
   bookingWindowDays   Int         @default(60)
   minNoticeHours      Int         @default(24)
   /// 祝日も予約を受け付けるか
@@ -138,10 +200,30 @@ model SchedulingCalendar {
   updatedAt           DateTime    @updatedAt
 
   user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team          Team           @relation(fields: [teamId], references: [id], onDelete: Cascade)
   customFields  CustomField[]
   bookings      Booking[]
   deliveryLinks DeliveryLink[]
+  participants  CalendarParticipant[]
 
+  @@index([userId])
+  @@index([teamId])
+}
+
+/// カレンダーの参加メンバー（空き枠判定・通知の対象）
+model CalendarParticipant {
+  id         String   @id @default(cuid())
+  calendarId String
+  userId     String
+  /// two_groups 用（1 or 2）。他モードでは null
+  groupIndex Int?
+  createdAt  DateTime @default(now())
+
+  calendar SchedulingCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([calendarId, userId])
+  @@index([calendarId])
   @@index([userId])
 }
 

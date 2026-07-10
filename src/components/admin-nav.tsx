@@ -4,24 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "カレンダー", exact: true },
-  { href: "/dashboard/team", label: "チーム設定" },
+  { href: "/admin/accounts", label: "アカウント" },
+  { href: "/admin/teams", label: "チーム" },
 ] as const;
 
-export function TeamSettingsNav() {
+export function AdminNav() {
   const pathname = usePathname();
 
   return (
     <aside className="w-44 shrink-0">
       <nav className="rounded-lg bg-white p-2 space-y-0.5">
-        {NAV_ITEMS.map(({ href, label, ...item }) => {
-          const exact = "exact" in item && item.exact;
-          const active =
-            href === "/dashboard"
-              ? pathname === "/dashboard" || pathname.startsWith("/calendars/")
-              : exact
-                ? pathname === href
-                : pathname === href || pathname.startsWith(`${href}/`);
+        {NAV_ITEMS.map(({ href, label }) => {
+          const active = pathname === href || pathname.startsWith(`${href}/`);
           return (
             <Link
               key={href}

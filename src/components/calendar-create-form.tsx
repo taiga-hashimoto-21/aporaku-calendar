@@ -9,6 +9,11 @@ import {
   createDefaultScheduleCandidateSettings,
 } from "@/components/schedule-candidate-settings";
 import {
+  CalendarParticipantSettings,
+  type CalendarParticipantSettingsValue,
+  type ParticipantMemberOption,
+} from "@/components/calendar-participant-settings";
+import {
   resolveScheduleCandidateSettings,
   type PresetMode,
   type ScheduleCandidateSettingsValue,
@@ -45,7 +50,15 @@ function FormLabel({
   );
 }
 
-export function CalendarCreateForm() {
+type CalendarCreateFormProps = {
+  currentUserId: string;
+  members: ParticipantMemberOption[];
+};
+
+export function CalendarCreateForm({
+  currentUserId,
+  members,
+}: CalendarCreateFormProps) {
   const [name, setName] = useState("");
   const [usePrivateName, setUsePrivateName] = useState(false);
   const [privateName, setPrivateName] = useState("");
@@ -59,6 +72,11 @@ export function CalendarCreateForm() {
   const [scheduleSettings, setScheduleSettings] = useState<ScheduleCandidateSettingsValue>(
     createDefaultScheduleCandidateSettings
   );
+  const [participantSettings, setParticipantSettings] =
+    useState<CalendarParticipantSettingsValue>({
+      mode: "all",
+      participantIds: [currentUserId],
+    });
 
   function validate() {
     const next: Record<string, string> = {};
@@ -99,6 +117,10 @@ export function CalendarCreateForm() {
     const resolvedDuration =
       durationMode === "custom" ? Number(customDuration) : durationMinutes;
     const resolvedSchedule = resolveScheduleCandidateSettings(scheduleSettings);
+    const participantIds =
+      participantSettings.participantIds.length > 0
+        ? participantSettings.participantIds
+        : [currentUserId];
 
     try {
       const res = await fetch("/api/calendars", {
@@ -114,6 +136,8 @@ export function CalendarCreateForm() {
           acceptHolidayBookings: resolvedSchedule.acceptHolidayBookings,
           minNoticeHours: resolvedSchedule.minNoticeHours,
           bookingWindowDays: resolvedSchedule.bookingWindowDays,
+          participationMode: participantSettings.mode,
+          participantIds,
         }),
       });
       const data = await res.json();
@@ -225,6 +249,15 @@ export function CalendarCreateForm() {
                   setCustomDuration(value);
                   setDurationMode("custom");
                 }}
+              />
+            </div>
+
+            <div className="grid grid-cols-[8.5rem_1fr] items-start gap-x-4 px-6 py-5">
+              <FormLabel>参加メンバー設定</FormLabel>
+              <CalendarParticipantSettings
+                members={members}
+                value={participantSettings}
+                onChange={setParticipantSettings}
               />
             </div>
 

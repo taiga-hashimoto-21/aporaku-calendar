@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { findAccessibleCalendar } from "@/lib/team";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -16,6 +17,8 @@ const updateSchema = z.object({
   minNoticeHours: z.number().int().min(0).max(168).optional(),
   isActive: z.boolean().optional(),
   weeklyAvailability: z.record(z.array(z.object({ start: z.string(), end: z.string() }))).optional(),
+  participationMode: z.enum(["all", "any", "two_groups"]).optional(),
+  participantIds: z.array(z.string().min(1)).optional(),
 });
 
 export async function PATCH(
@@ -30,19 +33,43 @@ export async function PATCH(
   const { id } = await params;
 
   try {
-    const existing = await prisma.schedulingCalendar.findFirst({
-      where: { id, userId: session.user.id },
-    });
+    const existing = await findAccessibleCalendar(session.user.id, id);
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
     const body = await request.json();
     const parsed = updateSchema.parse(body);
+    const { participantIds, ...calendarData } = parsed;
 
-    const calendar = await prisma.schedulingCalendar.update({
-      where: { id },
-      data: parsed,
+    const calendar = await prisma.$transaction(async (tx) => {
+      const updated = await tx.schedulingCalendar.update({
+        where: { id },
+        data: calendarData,
+      });
+
+      if (participantIds !== undefined) {
+        const teamMemberIds = new Set(
+          (
+            await tx.teamMember.findMany({
+              where: { teamId: existing.teamId },
+              select: { userId: true },
+            })
+          ).map((m) => m.userId)
+        );
+
+        let nextIds = [...new Set(participantIds)].filter((uid) => teamMemberIds.has(uid));
+        if (nextIds.length === 0) {
+          nextIds = [session.user!.id];
+        }
+
+        await tx.calendarParticipant.deleteMany({ where: { calendarId: id } });
+        await tx.calendarParticipant.createMany({
+          data: nextIds.map((userId) => ({ calendarId: id, userId })),
+        });
+      }
+
+      return updated;
     });
 
     return NextResponse.json({ calendar });
@@ -66,9 +93,7 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const existing = await prisma.schedulingCalendar.findFirst({
-    where: { id, userId: session.user.id },
-  });
+  const existing = await findAccessibleCalendar(session.user.id, id);
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

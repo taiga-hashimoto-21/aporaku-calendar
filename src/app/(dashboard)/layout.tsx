@@ -1,6 +1,7 @@
 import { auth, signOut } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { ensureCurrentTeam } from "@/lib/team";
 import { DashboardHeader } from "@/components/dashboard-header";
 
 async function handleSignOut() {
@@ -18,10 +19,13 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { name: true, image: true },
-  });
+  const [user, currentTeam] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { name: true, image: true },
+    }),
+    ensureCurrentTeam(session.user.id),
+  ]);
 
   const userName = user?.name ?? session.user.name ?? session.user.email ?? "ユーザー";
   const userImage = user?.image ?? session.user.image;
@@ -32,6 +36,7 @@ export default async function DashboardLayout({
         userName={userName}
         userImage={userImage}
         signOutAction={handleSignOut}
+        currentTeam={{ id: currentTeam.id, name: currentTeam.name }}
       />
       <main className="flex-1 w-full flex flex-col">{children}</main>
     </div>

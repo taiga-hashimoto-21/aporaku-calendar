@@ -2,14 +2,21 @@
 
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
+import { TeamSwitcher } from "@/components/team-switcher";
 
 type DashboardHeaderProps = {
   userName: string;
   userImage: string | null | undefined;
   signOutAction: () => void;
+  currentTeam: { id: string; name: string };
 };
 
-export function DashboardHeader({ userName, userImage, signOutAction }: DashboardHeaderProps) {
+export function DashboardHeader({
+  userName,
+  userImage,
+  signOutAction,
+  currentTeam,
+}: DashboardHeaderProps) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -26,13 +33,19 @@ export function DashboardHeader({ userName, userImage, signOutAction }: Dashboar
   const initial = userName.charAt(0).toUpperCase();
 
   return (
-    <header className="border-b border-border bg-white">
-      <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between">
-        <Link href="/dashboard" className="shrink-0 hover:opacity-80 transition-opacity">
-          <span className="text-sm font-semibold text-gray-900">日程調整アプリ</span>
-        </Link>
+    <header className="sticky top-0 z-50 border-b border-border bg-white">
+      <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <Link href="/dashboard" className="shrink-0 hover:opacity-80 transition-opacity">
+            <span className="text-sm font-semibold text-gray-900">日程調整アプリ</span>
+          </Link>
+          <TeamSwitcher
+            initialCurrentTeamId={currentTeam.id}
+            initialCurrentTeamName={currentTeam.name}
+          />
+        </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 shrink-0">
           <Link
             href="/dashboard"
             className="text-sm text-gray-600 hover:text-gray-900 transition-colors"

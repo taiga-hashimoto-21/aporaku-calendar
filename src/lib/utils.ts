@@ -19,8 +19,12 @@ export const RESERVED_SLUGS = new Set([
   "calendars",
   "settings",
   "account",
+  "admin",
   "api",
   "s",
+  "team",
+  "teams",
+  "invite",
   "_next",
   "favicon.ico",
 ]);

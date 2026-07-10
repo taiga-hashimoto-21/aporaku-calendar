@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { findAccessibleCalendar, listTeamMembers } from "@/lib/team";
 import { notFound } from "next/navigation";
 import { CalendarEditForm } from "@/components/calendar-edit-form";
 import { AccountSettingsSection } from "@/components/account-settings-section";
@@ -18,12 +18,10 @@ export default async function EditCalendarPage({
   const { id } = await params;
   const { created } = await searchParams;
 
-  const calendar = await prisma.schedulingCalendar.findFirst({
-    where: { id, userId: session.user.id },
-  });
-
+  const calendar = await findAccessibleCalendar(session.user.id, id);
   if (!calendar) notFound();
 
+  const members = await listTeamMembers(calendar.teamId);
   const publicUrl = buildPublicCalendarUrl(calendar.slug);
 
   return (
@@ -41,7 +39,16 @@ export default async function EditCalendarPage({
           minNoticeHours: calendar.minNoticeHours,
           isActive: calendar.isActive,
           weeklyAvailability: calendar.weeklyAvailability,
+          participationMode: calendar.participationMode,
+          participantIds: calendar.participants.map((p) => p.userId),
         }}
+        members={members.map((m) => ({
+          userId: m.userId,
+          name: m.name,
+          email: m.email,
+          image: m.image,
+        }))}
+        currentUserId={session.user.id}
         publicUrl={publicUrl}
         justCreated={created === "1"}
       />

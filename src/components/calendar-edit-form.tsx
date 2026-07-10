@@ -3,6 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarShareLink } from "@/components/calendar-share-link";
+import {
+  CalendarParticipantSettings,
+  type CalendarParticipantSettingsValue,
+  type ParticipantMemberOption,
+  type ParticipationModeValue,
+} from "@/components/calendar-participant-settings";
 
 interface CalendarEditFormProps {
   calendar: {
@@ -17,14 +23,30 @@ interface CalendarEditFormProps {
     minNoticeHours: number;
     isActive: boolean;
     weeklyAvailability: unknown;
+    participationMode: ParticipationModeValue;
+    participantIds: string[];
   };
+  members: ParticipantMemberOption[];
+  currentUserId: string;
   publicUrl: string;
   justCreated?: boolean;
 }
 
-export function CalendarEditForm({ calendar, publicUrl, justCreated = false }: CalendarEditFormProps) {
+export function CalendarEditForm({
+  calendar,
+  members,
+  currentUserId,
+  publicUrl,
+  justCreated = false,
+}: CalendarEditFormProps) {
   const router = useRouter();
   const [form, setForm] = useState(calendar);
+  const [participantSettings, setParticipantSettings] =
+    useState<CalendarParticipantSettingsValue>({
+      mode: calendar.participationMode,
+      participantIds:
+        calendar.participantIds.length > 0 ? calendar.participantIds : [currentUserId],
+    });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -35,11 +57,26 @@ export function CalendarEditForm({ calendar, publicUrl, justCreated = false }: C
     setError(null);
     setSaved(false);
 
+    const participantIds =
+      participantSettings.participantIds.length > 0
+        ? participantSettings.participantIds
+        : [currentUserId];
+
     try {
       const res = await fetch(`/api/calendars/${calendar.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          name: form.name,
+          description: form.description,
+          durationMinutes: form.durationMinutes,
+          meetingType: form.meetingType,
+          bookingWindowDays: form.bookingWindowDays,
+          minNoticeHours: form.minNoticeHours,
+          isActive: form.isActive,
+          participationMode: participantSettings.mode,
+          participantIds,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "保存に失敗しました");
@@ -91,7 +128,9 @@ export function CalendarEditForm({ calendar, publicUrl, justCreated = false }: C
               className="w-full rounded-lg border border-border px-3 py-2 text-sm"
             >
               {[15, 30, 45, 60, 90].map((m) => (
-                <option key={m} value={m}>{m}分</option>
+                <option key={m} value={m}>
+                  {m}分
+                </option>
               ))}
             </select>
           </Field>
@@ -142,6 +181,15 @@ export function CalendarEditForm({ calendar, publicUrl, justCreated = false }: C
           />
           公開する
         </label>
+
+        <div className="grid grid-cols-[8.5rem_1fr] items-start gap-x-4 rounded-lg border border-border bg-white px-4 py-4">
+          <span className="text-sm font-medium text-gray-700 pt-2">参加メンバー設定</span>
+          <CalendarParticipantSettings
+            members={members}
+            value={participantSettings}
+            onChange={setParticipantSettings}
+          />
+        </div>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
         {saved && <p className="text-sm text-green-600">保存しました</p>}

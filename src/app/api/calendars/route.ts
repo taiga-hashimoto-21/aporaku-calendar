@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ensureCurrentTeam } from "@/lib/team";
 import { CREATE_DEFAULT_WEEKLY_AVAILABILITY } from "@/lib/schedule-candidate-settings";
 import { buildPublicCalendarUrl } from "@/lib/utils";
 import { generateUniqueSlug } from "@/lib/slug";
@@ -34,6 +35,8 @@ const createSchema = z.object({
   acceptHolidayBookings: z.boolean().default(false),
   bookingWindowDays: z.number().int().min(1).max(365).default(60),
   minNoticeHours: z.number().int().min(0).max(168).default(12),
+  participationMode: z.enum(["all", "any", "two_groups"]).default("all"),
+  participantIds: z.array(z.string().min(1)).default([]),
 });
 
 export async function GET() {
@@ -42,8 +45,9 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const currentTeam = await ensureCurrentTeam(session.user.id);
   const calendars = await prisma.schedulingCalendar.findMany({
-    where: { userId: session.user.id },
+    where: { teamId: currentTeam.id },
     orderBy: { createdAt: "desc" },
   });
 
@@ -60,10 +64,28 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const parsed = createSchema.parse(body);
     const slug = await generateUniqueSlug();
+    const currentTeam = await ensureCurrentTeam(session.user.id);
+
+    const teamMemberIds = new Set(
+      (
+        await prisma.teamMember.findMany({
+          where: { teamId: currentTeam.id },
+          select: { userId: true },
+        })
+      ).map((m) => m.userId)
+    );
+
+    const requestedIds =
+      parsed.participantIds.length > 0 ? parsed.participantIds : [session.user.id];
+    let participantIds = [...new Set(requestedIds)].filter((id) => teamMemberIds.has(id));
+    if (participantIds.length === 0) {
+      participantIds = [session.user.id];
+    }
 
     const calendar = await prisma.schedulingCalendar.create({
       data: {
         userId: session.user.id,
+        teamId: currentTeam.id,
         slug,
         name: parsed.name,
         privateName: parsed.privateName ?? null,
@@ -78,6 +100,10 @@ export async function POST(request: NextRequest) {
         bookingWindowDays: parsed.bookingWindowDays,
         minNoticeHours: parsed.minNoticeHours,
         meetingType: "none",
+        participationMode: parsed.participationMode,
+        participants: {
+          create: participantIds.map((userId) => ({ userId })),
+        },
       },
     });
 

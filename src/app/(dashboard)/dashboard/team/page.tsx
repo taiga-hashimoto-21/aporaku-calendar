@@ -1,38 +1,29 @@
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
-import { AccountSettingsSection } from "@/components/account-settings-section";
-
-const LABEL_CLASS = "text-sm font-medium text-gray-700 pt-2";
+import { ensureCurrentTeam, listTeamMembers } from "@/lib/team";
+import {
+  AccountSettingsSection,
+  SettingsCard,
+} from "@/components/account-settings-section";
+import { TeamProfileForm } from "@/components/team-profile-form";
+import { TeamMembersSection } from "@/components/team-members-section";
 
 export default async function TeamSettingsPage() {
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { teamSlug: true, timezone: true },
-  });
-
-  if (!user) return null;
+  const team = await ensureCurrentTeam(session.user.id);
+  const members = await listTeamMembers(team.id);
+  const isOwner = team.ownerUserId === session.user.id;
 
   return (
-    <AccountSettingsSection title="チーム">
-      <div className="grid grid-cols-[8.5rem_1fr] gap-x-4 gap-y-5 items-start">
-        <span className={LABEL_CLASS}>チーム ID</span>
-        <input
-          type="text"
-          readOnly
-          value={user.teamSlug}
-          className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-gray-600 font-mono"
-        />
-
-        <span className={LABEL_CLASS}>タイムゾーン</span>
-        <input
-          type="text"
-          readOnly
-          value={user.timezone}
-          className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-gray-600"
-        />
+    <AccountSettingsSection title="チーム設定" unboxed>
+      <div className="space-y-4">
+        <SettingsCard>
+          <TeamProfileForm key={team.id} teamId={team.id} initialName={team.name} />
+        </SettingsCard>
+        <SettingsCard>
+          <TeamMembersSection members={members} isOwner={isOwner} />
+        </SettingsCard>
       </div>
     </AccountSettingsSection>
   );
