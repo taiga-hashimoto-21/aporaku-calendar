@@ -1,0 +1,126 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #111827;
+  --primary: #0b57d0;
+  --primary-hover: #094ab8;
+  --primary-light: #d3e3fd;
+  --primary-foreground: #ffffff;
+  --muted: #f3f4f6;
+  --border: #e5e7eb;
+  --gm3-sys-color-outline-variant: #c4c7c5;
+  --gm3-sys-color-primary: #0b57d0;
+  --gm3-sys-color-primary-container: #c2e7ff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-light: var(--primary-light);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* sonner: 右から入って右へ消える + 幅300px固定 */
+[data-sonner-toaster].app-toaster {
+  width: 300px !important;
+  --width: 300px !important;
+}
+
+[data-sonner-toaster].app-toaster [data-sonner-toast][data-styled="true"] {
+  width: 300px !important;
+}
+
+[data-sonner-toaster].app-toaster[data-x-position="right"]
+  [data-sonner-toast][data-y-position="bottom"] {
+  --y: translateX(110%);
+}
+
+[data-sonner-toaster].app-toaster[data-x-position="right"] [data-sonner-toast][data-mounted="true"] {
+  --y: translateX(0);
+  opacity: 1;
+}
+
+[data-sonner-toaster].app-toaster[data-x-position="right"]
+  [data-sonner-toast][data-mounted="true"][data-expanded="true"] {
+  --y: translateX(0) translateY(calc(var(--lift) * var(--offset)));
+}
+
+[data-sonner-toaster].app-toaster[data-x-position="right"]
+  [data-sonner-toast][data-expanded="false"][data-front="false"] {
+  --y: translateX(0) translateY(calc(var(--lift-amount) * var(--toasts-before)))
+    scale(calc(-1 * var(--scale)));
+}
+
+[data-sonner-toaster].app-toaster[data-x-position="right"]
+  [data-sonner-toast][data-removed="true"][data-front="true"][data-swipe-out="false"] {
+  --y: translateX(110%);
+  opacity: 0;
+}
+
+[data-sonner-toaster].app-toaster[data-x-position="right"]
+  [data-sonner-toast][data-removed="true"][data-front="false"][data-swipe-out="false"][data-expanded="true"] {
+  --y: translateX(110%);
+  opacity: 0;
+}
+
+[data-sonner-toaster].app-toaster[data-x-position="right"]
+  [data-sonner-toast][data-removed="true"][data-front="false"][data-swipe-out="false"][data-expanded="false"] {
+  --y: translateX(110%);
+  opacity: 0;
+}
+
+@keyframes booking-modal-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes booking-modal-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.booking-modal-backdrop {
+  opacity: 0;
+  animation: booking-modal-backdrop-in 0.15s ease-out forwards;
+}
+
+.booking-modal-panel {
+  transform: scale(0.8);
+  opacity: 0;
+  transform-origin: center center;
+  animation: booking-modal-pop-in 0.15s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .booking-modal-backdrop,
+  .booking-modal-panel {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Auth.js 標準モデル
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  teamSlug      String    @unique
+  /// アポラク User.id（連携時に設定。配信リンクのデフォルトカレンダー解決に使用）
+  aporakuUserId String?   @unique
+  timezone      String    @default("Asia/Tokyo")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts            Account[]
+  sessions            Session[]
+  calendars           SchedulingCalendar[]
+  googleConnection    GoogleConnection?
+  zoomConnection      ZoomConnection?
+  webhookEndpoints    WebhookEndpoint[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------------------------------------------------------------------------
+// 外部連携
+// ---------------------------------------------------------------------------
+
+model GoogleConnection {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  accessTokenEnc   String   @db.Text
+  refreshTokenEnc  String   @db.Text
+  expiresAt        DateTime
+  calendarId       String   @default("primary")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ZoomConnection {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  accessTokenEnc  String   @db.Text
+  refreshTokenEnc String   @db.Text
+  expiresAt       DateTime
+  zoomUserId      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ---------------------------------------------------------------------------
+// 日程調整カレンダー
+// ---------------------------------------------------------------------------
+
+enum MeetingType {
+  none
+  zoom
+  google_meet
+}
+
+model SchedulingCalendar {
+  id                  String      @id @default(cuid())
+  userId              String
+  /// 公開 URL 用 ID（全体で一意）。例: FW4awsNdUMWJ2xvn7
+  slug                String      @unique
+  name                String
+  /// 管理画面用の非公開名（公開ページには表示しない）
+  privateName         String?
+  description         String?
+  durationMinutes     Int         @default(30)
+  bufferBeforeMinutes Int         @default(0)
+  bufferAfterMinutes  Int         @default(0)
+  /// Google カレンダー等に登録する確保時間ブロックの予定名
+  bufferEventName     String?
+  timezone            String      @default("Asia/Tokyo")
+  /// 曜日ごとの受付時間帯 JSON
+  /// { "monday": [{ "start": "09:00", "end": "18:00" }], ... }
+  weeklyAvailability  Json
+  /// 特定日の上書き JSON
+  /// [{ "date": "2026-07-10", "slots": [{ "start": "10:00", "end": "12:00" }] }]
+  dateOverrides       Json        @default("[]")
+  meetingType         MeetingType @default(none)
+  bookingWindowDays   Int         @default(60)
+  minNoticeHours      Int         @default(24)
+  /// 祝日も予約を受け付けるか
+  acceptHolidayBookings Boolean     @default(false)
+  isActive            Boolean     @default(true)
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customFields  CustomField[]
+  bookings      Booking[]
+  deliveryLinks DeliveryLink[]
+
+  @@index([userId])
+}
+
+/// slug 生成用シーケンス（カレンダー slug・配信リンク slug 共通）
+model SlugSequence {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+}
+
+/// 配信1件 = slug 1つ。企業・経由・文面を保持（クエリパラメータ不要）
+model DeliveryLink {
+  id                String    @id @default(cuid())
+  slug              String    @unique
+  calendarId        String
+  aporakuUserId     String
+  channel           String // "form" | "email" | "call"
+  patternId         String?
+  outreachSubjectId String?
+  companyId         String?
+  companyName       String?
+  companyDomain     String?
+  clickedAt         DateTime?
+  clickCount        Int       @default(0)
+  bookedAt          DateTime?
+  createdAt         DateTime  @default(now())
+
+  calendar SchedulingCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  booking  Booking?           @relation("DeliveryLinkBooking")
+
+  @@index([calendarId])
+  @@index([aporakuUserId])
+  @@index([channel])
+  @@index([patternId])
+  @@index([companyId])
+  @@index([companyDomain])
+  @@index([aporakuUserId, clickedAt])
+}
+
+enum CustomFieldType {
+  text
+  textarea
+  select
+}
+
+model CustomField {
+  id         String          @id @default(cuid())
+  calendarId String
+  label      String
+  fieldType  CustomFieldType @default(text)
+  required   Boolean         @default(false)
+  options    Json?
+  sortOrder  Int             @default(0)
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  calendar SchedulingCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  answers  BookingAnswer[]
+
+  @@index([calendarId])
+}
+
+// ---------------------------------------------------------------------------
+// 予約
+// ---------------------------------------------------------------------------
+
+enum BookingStatus {
+  confirmed
+  cancelled
+  rescheduled
+}
+
+model Booking {
+  id                String        @id @default(cuid())
+  calendarId        String
+  status            BookingStatus @default(confirmed)
+  startAt           DateTime
+  endAt             DateTime
+  guestName         String
+  guestEmail        String
+  guestCompany      String?
+  googleEventId     String?
+  zoomMeetingId     String?
+  zoomMeetingUrl    String?
+  meetUrl           String?
+  /// 配信リンク経由の場合にセット
+  deliveryLinkId    String?       @unique
+  channel           String?
+  patternId         String?
+  outreachSubjectId String?
+  companyId         String?
+  companyName       String?
+  companyDomain     String?
+  cancellationToken String        @unique @default(cuid())
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  calendar     SchedulingCalendar @relation(fields: [calendarId], references: [id], onDelete: Cascade)
+  deliveryLink DeliveryLink?      @relation("DeliveryLinkBooking", fields: [deliveryLinkId], references: [id], onDelete: SetNull)
+  answers      BookingAnswer[]
+
+  @@index([calendarId])
+  @@index([status])
+  @@index([startAt])
+  @@index([channel])
+  @@index([patternId])
+  @@index([companyId])
+}
+
+model BookingAnswer {
+  id        String   @id @default(cuid())
+  bookingId String
+  fieldId   String?
+  label     String
+  value     String   @db.Text
+  createdAt DateTime @default(now())
+
+  booking Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  field   CustomField? @relation(fields: [fieldId], references: [id], onDelete: SetNull)
+
+  @@index([bookingId])
+}
+
+// ---------------------------------------------------------------------------
+// Webhook（Phase 3）
+// ---------------------------------------------------------------------------
+
+model WebhookEndpoint {
+  id        String   @id @default(cuid())
+  userId    String
+  url       String
+  secret    String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
