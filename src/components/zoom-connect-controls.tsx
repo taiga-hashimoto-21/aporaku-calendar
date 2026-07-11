@@ -52,12 +52,15 @@ export function ZoomConnectControls({
           {disconnecting ? "解除中..." : "連携を解除"}
         </button>
       ) : (
-        <a
-          href="/api/integrations/zoom/authorize"
+        <button
+          type="button"
+          onClick={() => {
+            window.location.href = "/api/integrations/zoom/authorize";
+          }}
           className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-muted transition-colors"
         >
           Zoom と連携する
-        </a>
+        </button>
       )}
     </div>
   );
