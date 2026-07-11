@@ -33,6 +33,9 @@ export function MarketingFooter() {
       <div className="mx-auto max-w-5xl px-6 py-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <p className="text-xs text-gray-400">{SERVICE_NAME}</p>
         <nav className="flex flex-wrap items-center gap-4 text-xs text-gray-500">
+          <Link href="/docs/zoom" className="hover:text-gray-900 transition-colors">
+            Zoom連携ガイド
+          </Link>
           <Link href="/terms" className="hover:text-gray-900 transition-colors">
             利用規約
           </Link>
@@ -47,9 +50,11 @@ export function MarketingFooter() {
 
 export function LegalPageShell({
   title,
+  description,
   children,
 }: {
   title: string;
+  description?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -62,7 +67,7 @@ export function LegalPageShell({
               {title}
             </h1>
             <p className="text-sm text-gray-500">
-              {SERVICE_NAME} をご利用いただく前にご確認ください。
+              {description ?? `${SERVICE_NAME} をご利用いただく前にご確認ください。`}
             </p>
           </div>
           <div className="prose-legal space-y-8 text-sm text-gray-700 leading-relaxed">

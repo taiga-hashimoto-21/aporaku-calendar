@@ -5,7 +5,6 @@ import {
   MarketingFooter,
   MarketingHeader,
 } from "@/components/marketing-chrome";
-import { SERVICE_NAME } from "@/lib/brand";
 
 export default async function HomePage() {
   const session = await auth();
@@ -45,11 +44,6 @@ export default async function HomePage() {
               ログイン
             </Link>
           </div>
-
-          <p className="text-xs text-gray-400">
-            {SERVICE_NAME}{" "}
-            の無料プランは完全無料。クレジットカード登録不要です。
-          </p>
         </div>
       </main>
 
