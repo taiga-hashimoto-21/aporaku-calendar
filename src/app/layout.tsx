@@ -26,6 +26,9 @@ export const metadata: Metadata = {
       noimageindex: true,
     },
   },
+  other: {
+    "zoom-domain-verification": "ZOOM_verify_67521ed975ec44fa8f14738a9102919d",
+  },
 };
 
 export default function RootLayout({
