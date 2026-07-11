@@ -67,7 +67,7 @@ export const DEFAULT_BOOKING_EMAIL_TEMPLATES: BookingEmailTemplateDef[] = [
 {キャンセルURL}
 ーーーーーーーーーーーーーーーーーーー
 
-※このメールは日程調整ツールからの自動配信です。このメールへの返信は受け付けていません。`,
+※このメールはアポラク日程調整からの自動配信です。このメールへの返信は受け付けていません。`,
   },
   {
     key: "host",
@@ -94,7 +94,7 @@ export const DEFAULT_BOOKING_EMAIL_TEMPLATES: BookingEmailTemplateDef[] = [
 {経由}
 ーーーーーーーーーーーーーーーーーーー
 
-※このメールは日程調整ツールからの自動配信です。このメールへの返信は受け付けていません。`,
+※このメールはアポラク日程調整からの自動配信です。このメールへの返信は受け付けていません。`,
   },
 ];
 

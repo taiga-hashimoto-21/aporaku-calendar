@@ -7,7 +7,7 @@ export function AdminFrameSkeleton() {
       <header className="sticky top-0 z-50 border-b border-border bg-white">
         <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between gap-4">
           <span className="shrink-0 text-sm font-semibold text-gray-900">
-            日程調整アプリ
+            アポラク日程調整
           </span>
           <div className="flex items-center gap-2 rounded-lg px-2 py-1.5 bg-muted">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-200 text-gray-500">

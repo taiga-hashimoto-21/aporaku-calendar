@@ -39,7 +39,7 @@ export function DashboardHeader({
       <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <Link to="/dashboard" className="shrink-0 hover:opacity-80 transition-opacity">
-            <span className="text-sm font-semibold text-gray-900">日程調整アプリ</span>
+            <span className="text-sm font-semibold text-gray-900">アポラク日程調整</span>
           </Link>
           <TeamSwitcher
             initialCurrentTeamId={currentTeam.id}

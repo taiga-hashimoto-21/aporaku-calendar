@@ -40,7 +40,7 @@ export default async function TeamInvitePage({ params }: PageProps) {
         <header className="border-b border-border">
           <div className="mx-auto max-w-5xl px-6 py-4">
             <Link href="/" className="text-sm font-semibold hover:opacity-80">
-              日程調整アプリ
+              アポラク日程調整
             </Link>
           </div>
         </header>

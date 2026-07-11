@@ -44,7 +44,7 @@ export function CompanyOnboardingPage() {
             to="/dashboard"
             className="text-sm font-semibold text-gray-900 hover:opacity-80"
           >
-            日程調整アプリ
+            アポラク日程調整
           </Link>
         </div>
       </header>

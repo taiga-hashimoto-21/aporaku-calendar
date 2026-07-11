@@ -104,7 +104,7 @@ export function DashboardFrameSkeleton() {
       <header className="sticky top-0 z-50 border-b border-border bg-white">
         <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="shrink-0 text-sm font-semibold text-gray-900">日程調整アプリ</span>
+            <span className="shrink-0 text-sm font-semibold text-gray-900">アポラク日程調整</span>
             <div className="inline-flex w-fit max-w-[600px] items-center gap-1.5 rounded-lg border border-border bg-white px-3 py-1.5">
               <div className="h-4 w-28 rounded shimmer" />
               <svg

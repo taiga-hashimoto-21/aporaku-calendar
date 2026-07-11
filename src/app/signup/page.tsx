@@ -7,7 +7,7 @@ export default function SignupPage() {
       <header className="border-b border-border">
         <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between">
           <Link href="/" className="text-sm font-semibold hover:opacity-80">
-            日程調整ツール
+            アポラク日程調整
           </Link>
           <Link href="/login" className="text-sm text-gray-600 hover:text-gray-900">
             ログインはこちら

@@ -18,7 +18,7 @@ export function AdminLoginPage() {
       <main className="min-h-screen flex flex-col bg-gray-50">
         <header className="border-b border-border bg-white">
           <div className="mx-auto max-w-5xl px-6 py-4">
-            <span className="text-sm font-semibold text-gray-900">日程調整アプリ</span>
+            <span className="text-sm font-semibold text-gray-900">アポラク日程調整</span>
           </div>
         </header>
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
@@ -49,7 +49,7 @@ export function AdminLoginPage() {
       <header className="border-b border-border bg-white">
         <div className="mx-auto max-w-5xl px-6 py-4">
           <Link to="/" className="text-sm font-semibold text-gray-900 hover:opacity-80">
-            日程調整アプリ
+            アポラク日程調整
           </Link>
         </div>
       </header>

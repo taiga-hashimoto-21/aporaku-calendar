@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import {
+  MarketingFooter,
+  MarketingHeader,
+} from "@/components/marketing-chrome";
+import { SERVICE_NAME } from "@/lib/brand";
 
 export default async function HomePage() {
   const session = await auth();
@@ -11,25 +16,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b border-border">
-        <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between">
-          <span className="text-sm font-semibold">日程調整ツール</span>
-          <nav className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="text-sm text-gray-600 hover:text-gray-900 px-3 py-1.5"
-            >
-              ログイン
-            </Link>
-            <Link
-              href="/signup"
-              className="text-sm font-medium bg-primary text-primary-foreground px-4 py-1.5 rounded-lg hover:bg-primary-hover transition-colors"
-            >
-              無料で新規登録
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <MarketingHeader />
 
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-16">
         <div className="max-w-xl text-center space-y-8">
@@ -60,10 +47,13 @@ export default async function HomePage() {
           </div>
 
           <p className="text-xs text-gray-400">
-            無料プランは完全無料。クレジットカード登録不要です。
+            {SERVICE_NAME}{" "}
+            の無料プランは完全無料。クレジットカード登録不要です。
           </p>
         </div>
       </main>
+
+      <MarketingFooter />
     </div>
   );
 }

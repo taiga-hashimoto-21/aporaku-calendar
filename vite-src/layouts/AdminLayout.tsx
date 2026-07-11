@@ -14,7 +14,7 @@ export function AdminLayout() {
             to="/admin/accounts"
             className="shrink-0 text-sm font-semibold text-gray-900 hover:opacity-80 transition-opacity"
           >
-            日程調整アプリ
+            アポラク日程調整
           </Link>
           <AdminUserMenu onLogout={clearSession} />
         </div>

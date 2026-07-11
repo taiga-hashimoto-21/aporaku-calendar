@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "日程調整ツール",
-  description: "Googleカレンダー連携の日程調整サービス",
+  title: "アポラク日程調整",
+  description: "Googleカレンダー連携の日程調整サービス「アポラク日程調整」",
 };
 
 export default function RootLayout({
