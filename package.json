@@ -3,13 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3002",
-    "build": "prisma generate && next build",
+    "dev": "concurrently -n api,vite -c blue,green \"npm run dev:api\" \"npm run dev:vite\"",
+    "dev:api": "next dev -p 3003",
+    "dev:vite": "vite",
+    "dev:next": "next dev -p 3002",
+    "build": "npm run build:vite && npm run copy:dist && npm run build:api",
+    "build:vite": "vite build",
+    "copy:dist": "rm -rf public/assets public/index.html && mkdir -p public && cp -r dist/* public/",
+    "build:api": "prisma generate && next build",
     "start": "next start -p 3002",
     "lint": "next lint",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.vite.json"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.9.1",
@@ -20,6 +27,7 @@
     "next-auth": "^5.0.0-beta.25",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-router-dom": "^7.18.1",
     "sonner": "^2.0.7",
     "sqids": "^0.3.0",
     "zod": "^3.25.51"
@@ -27,14 +35,18 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
     "@tailwindcss/postcss": "^4.1.8",
+    "@tailwindcss/vite": "^4.3.2",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.15.29",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.5",
+    "@vitejs/plugin-react": "^6.0.3",
+    "concurrently": "^10.0.3",
     "eslint": "^9.28.0",
     "eslint-config-next": "^15.3.3",
     "prisma": "^6.18.0",
     "tailwindcss": "^4.1.8",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vite": "^8.1.4"
   }
 }

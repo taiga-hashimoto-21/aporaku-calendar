@@ -21,7 +21,7 @@ export default function SignupPage() {
             <h1 className="text-2xl font-bold">無料で新規登録</h1>
             <p className="text-sm text-gray-600 leading-relaxed">
               Google アカウントで登録し、カレンダー連携を行います。
-              初回登録後すぐに日程調整カレンダーを作成できます。
+              登録後に氏名・会社名を確認して、すぐに日程調整を始められます。
             </p>
           </div>
 

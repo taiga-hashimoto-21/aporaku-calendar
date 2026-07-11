@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { CalendarShareLink } from "@/components/calendar-share-link";
 import { PresetSelectField } from "@/components/preset-select-field";
@@ -170,13 +170,13 @@ export function CalendarCreateForm({
 
         <div className="flex flex-wrap justify-center gap-3 pt-2">
           <Link
-            href={`/calendars/${issuedLink.id}/edit`}
+            to={`/calendars/${issuedLink.id}/edit`}
             className="rounded-lg border border-border bg-white px-5 py-2.5 text-sm font-medium text-gray-900 hover:bg-muted transition-colors"
           >
             設定を続ける
           </Link>
           <Link
-            href="/dashboard"
+            to="/dashboard"
             className="rounded-lg border border-border bg-white px-5 py-2.5 text-sm font-medium text-gray-900 hover:bg-muted transition-colors"
           >
             カレンダー一覧へ
@@ -258,6 +258,7 @@ export function CalendarCreateForm({
                 members={members}
                 value={participantSettings}
                 onChange={setParticipantSettings}
+                fallbackUserId={currentUserId}
               />
             </div>
 

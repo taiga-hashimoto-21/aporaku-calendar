@@ -1,20 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 type TeamProfileFormProps = {
   teamId: string;
   initialName: string;
+  onSaved?: (name: string) => void;
 };
 
 export const TEAM_SETTINGS_LABEL_CLASS = "text-sm font-medium text-gray-700 pt-2";
 export const TEAM_SETTINGS_GRID_CLASS =
   "grid grid-cols-[8.5rem_1fr] gap-x-4 items-start";
 
-export function TeamProfileForm({ teamId, initialName }: TeamProfileFormProps) {
-  const router = useRouter();
+export function TeamProfileForm({ teamId, initialName, onSaved }: TeamProfileFormProps) {
   const [name, setName] = useState(initialName);
   const [loading, setLoading] = useState(false);
 
@@ -26,6 +25,7 @@ export function TeamProfileForm({ teamId, initialName }: TeamProfileFormProps) {
       const res = await fetch("/api/team", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           name: name.trim(),
         }),
@@ -33,9 +33,13 @@ export function TeamProfileForm({ teamId, initialName }: TeamProfileFormProps) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "保存に失敗しました");
 
-      setName(data.name ?? name);
+      const nextName = data.name ?? name.trim();
+      setName(nextName);
       toast.success("保存しました");
-      router.refresh();
+      onSaved?.(nextName);
+      window.dispatchEvent(
+        new CustomEvent("team-changed", { detail: { id: teamId, name: nextName } })
+      );
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "保存に失敗しました");
     } finally {

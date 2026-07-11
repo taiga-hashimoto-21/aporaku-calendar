@@ -51,7 +51,14 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json({ calendars });
+  const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? "http://localhost:3002";
+
+  return NextResponse.json({
+    calendars: calendars.map((cal) => ({
+      ...cal,
+      publicUrl: buildPublicCalendarUrl(cal.slug, baseUrl),
+    })),
+  });
 }
 
 export async function POST(request: NextRequest) {

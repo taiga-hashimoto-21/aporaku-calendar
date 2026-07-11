@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useNavigate } from "react-router-dom";
 
-export function AdminLoginForm() {
-  const router = useRouter();
+type Props = {
+  onSuccess?: () => void | Promise<unknown>;
+};
+
+export function AdminLoginForm({ onSuccess }: Props) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -19,12 +23,13 @@ export function AdminLoginForm() {
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "ログインに失敗しました");
-      router.replace("/admin/accounts");
-      router.refresh();
+      await onSuccess?.();
+      navigate("/admin/accounts", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "ログインに失敗しました");
     } finally {
@@ -67,7 +72,7 @@ export function AdminLoginForm() {
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-gray-400 hover:text-gray-700 transition-colors"
+            className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer rounded-md p-1.5 text-gray-400 hover:text-gray-700 transition-colors"
             aria-label={showPassword ? "パスワードを隠す" : "パスワードを表示"}
           >
             {showPassword ? <EyeOffIcon /> : <EyeIcon />}
@@ -82,7 +87,7 @@ export function AdminLoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-50 transition-colors"
+        className="w-full cursor-pointer rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary-hover disabled:opacity-50 transition-colors"
       >
         {loading ? "ログイン中..." : "ログイン"}
       </button>

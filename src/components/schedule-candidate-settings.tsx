@@ -89,17 +89,11 @@ export function ScheduleCandidateSettings({
                 type="button"
                 aria-label={`${day.label}の受付時間を編集`}
                 onClick={() => openDayEditor(day.key)}
-                className={`flex min-w-0 flex-1 flex-col items-stretch justify-start bg-white transition-colors hover:bg-muted/50 ${
+                className={`flex min-w-0 flex-1 cursor-pointer flex-col items-stretch justify-start bg-white transition-colors hover:bg-muted/50 ${
                   index < WEEKDAY_OPTIONS.length - 1 ? "border-r border-border" : ""
                 }`}
               >
-                <div className="relative shrink-0 px-2 pt-3">
-                  <span
-                    className="pointer-events-none absolute right-1.5 top-1.5 z-10 text-gray-400"
-                    aria-hidden
-                  >
-                    <PencilIcon />
-                  </span>
+                <div className="shrink-0 px-2 pt-3">
                   <p className="w-full whitespace-nowrap text-center text-sm font-bold leading-5 text-gray-900">
                     {day.label}
                   </p>
@@ -417,19 +411,6 @@ function TimeInput({
         <ClockIcon />
       </span>
     </div>
-  );
-}
-
-function PencilIcon() {
-  return (
-    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" aria-hidden>
-      <path
-        d="M11.5 2.5 13.5 4.5 5 13H3v-2L11.5 2.5Z"
-        stroke="currentColor"
-        strokeWidth="1.25"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }
 

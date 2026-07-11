@@ -17,6 +17,11 @@
 
 # production
 /build
+/dist
+
+# vite spa copied into public for Next serving
+/public/assets
+/public/index.html
 
 # misc
 .DS_Store

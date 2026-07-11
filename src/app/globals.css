@@ -27,6 +27,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* スクロールバー有無でコンテンツ幅が変わってレイアウトがズレるのを防ぐ */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -129,5 +134,27 @@ body {
     animation: none;
     opacity: 1;
     transform: none;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, #e5e7eb 0%, #f3f4f6 40%, #e5e7eb 80%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+    background: #e5e7eb;
   }
 }

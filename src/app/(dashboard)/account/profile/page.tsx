@@ -9,7 +9,7 @@ export default async function ProfilePage() {
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { name: true, email: true },
+    select: { name: true, email: true, companyName: true },
   });
 
   if (!user) return null;
@@ -18,6 +18,7 @@ export default async function ProfilePage() {
     <AccountSettingsSection title="プロフィール">
       <ProfileNameForm
         initialName={user.name ?? session.user.name ?? ""}
+        initialCompanyName={user.companyName ?? ""}
         email={user.email}
       />
     </AccountSettingsSection>

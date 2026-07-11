@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 export type ParticipationModeValue = "all" | "any" | "two_groups";
 
@@ -28,12 +28,15 @@ type CalendarParticipantSettingsProps = {
   members: ParticipantMemberOption[];
   value: CalendarParticipantSettingsValue;
   onChange: (value: CalendarParticipantSettingsValue) => void;
+  /** チーム外になった選択を外したあと、空ならこのユーザーを残す（作成フォーム用） */
+  fallbackUserId?: string;
 };
 
 export function CalendarParticipantSettings({
   members,
   value,
   onChange,
+  fallbackUserId,
 }: CalendarParticipantSettingsProps) {
   // チーム所属メンバーのみ（念のため userId で一意化）
   const teamMembers = useMemo(() => {
@@ -43,6 +46,27 @@ export function CalendarParticipantSettings({
     }
     return [...map.values()];
   }, [members]);
+
+  // チーム外の選択済みメンバーは state からも削除（表示上の非表示だけでは不十分）
+  useEffect(() => {
+    const allowed = new Set(teamMembers.map((m) => m.userId));
+    const pruned = value.participantIds.filter((id) => allowed.has(id));
+    let nextIds = pruned;
+    if (
+      nextIds.length === 0 &&
+      fallbackUserId &&
+      allowed.has(fallbackUserId)
+    ) {
+      nextIds = [fallbackUserId];
+    }
+    if (
+      nextIds.length === value.participantIds.length &&
+      nextIds.every((id, i) => id === value.participantIds[i])
+    ) {
+      return;
+    }
+    onChange({ mode: value.mode, participantIds: nextIds });
+  }, [teamMembers, value.participantIds, value.mode, onChange, fallbackUserId]);
 
   const selectedMembers = useMemo(
     () => teamMembers.filter((m) => value.participantIds.includes(m.userId)),

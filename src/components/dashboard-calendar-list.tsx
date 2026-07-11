@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { CalendarShareLink } from "@/components/calendar-share-link";
 
 type CalendarListItem = {
@@ -27,7 +27,7 @@ export function DashboardCalendarList({ calendars }: { calendars: CalendarListIt
             </p>
           </div>
           <Link
-            href={`/calendars/${cal.id}/edit`}
+            to={`/calendars/${cal.id}/edit`}
             className="shrink-0 text-sm text-primary hover:underline"
           >
             編集

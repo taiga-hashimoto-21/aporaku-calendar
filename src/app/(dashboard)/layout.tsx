@@ -1,14 +1,10 @@
-import { auth, signOut } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ensureCurrentTeam } from "@/lib/team";
-import { DashboardHeader } from "@/components/dashboard-header";
+import { DashboardChrome } from "@/components/dashboard-chrome";
 
-async function handleSignOut() {
-  "use server";
-  await signOut({ redirectTo: "/" });
-}
-
+/** Next 側フォールバック用（本番は middleware で SPA に rewrite） */
 export default async function DashboardLayout({
   children,
 }: {
@@ -31,14 +27,12 @@ export default async function DashboardLayout({
   const userImage = user?.image ?? session.user.image;
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <DashboardHeader
-        userName={userName}
-        userImage={userImage}
-        signOutAction={handleSignOut}
-        currentTeam={{ id: currentTeam.id, name: currentTeam.name }}
-      />
-      <main className="flex-1 w-full flex flex-col">{children}</main>
-    </div>
+    <DashboardChrome
+      userName={userName}
+      userImage={userImage}
+      currentTeam={{ id: currentTeam.id, name: currentTeam.name }}
+    >
+      {children}
+    </DashboardChrome>
   );
 }

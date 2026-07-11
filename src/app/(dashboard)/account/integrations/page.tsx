@@ -5,6 +5,7 @@ import {
   AccountSettingsSection,
   StatusBadge,
 } from "@/components/account-settings-section";
+import { ZoomConnectControls } from "@/components/zoom-connect-controls";
 
 export default async function AccountIntegrationsPage() {
   const session = await auth();
@@ -44,9 +45,9 @@ export default async function AccountIntegrationsPage() {
         <section className="space-y-3 pt-6 border-t border-border">
           <h3 className="text-sm font-medium text-gray-900">Zoom</h3>
           <p className="text-sm text-gray-600 leading-relaxed">
-            カレンダー設定で Zoom を選択した場合にミーティング URL を自動発行します（Phase 2）。
+            カレンダー設定で Zoom を選択した場合に、予約確定時にミーティング URL を自動発行します。
           </p>
-          <StatusBadge connected={Boolean(zoom)} label={zoom ? "連携済み" : "未連携（Phase 2）"} />
+          <ZoomConnectControls connected={Boolean(zoom)} />
         </section>
       </div>
     </AccountSettingsSection>

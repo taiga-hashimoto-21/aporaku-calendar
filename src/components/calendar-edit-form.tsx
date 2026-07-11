@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { CalendarShareLink } from "@/components/calendar-share-link";
 import {
   CalendarParticipantSettings,
@@ -30,6 +29,7 @@ interface CalendarEditFormProps {
   currentUserId: string;
   publicUrl: string;
   justCreated?: boolean;
+  onSaved?: () => void;
 }
 
 export function CalendarEditForm({
@@ -38,8 +38,8 @@ export function CalendarEditForm({
   currentUserId,
   publicUrl,
   justCreated = false,
+  onSaved,
 }: CalendarEditFormProps) {
-  const router = useRouter();
   const [form, setForm] = useState(calendar);
   const [participantSettings, setParticipantSettings] =
     useState<CalendarParticipantSettingsValue>({
@@ -66,6 +66,7 @@ export function CalendarEditForm({
       const res = await fetch(`/api/calendars/${calendar.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           name: form.name,
           description: form.description,
@@ -81,7 +82,7 @@ export function CalendarEditForm({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "保存に失敗しました");
       setSaved(true);
-      router.refresh();
+      onSaved?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存に失敗しました");
     } finally {

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { emailToTeamSlug, generateSlug, isReservedSlug } from "@/lib/utils";
 import type { Team, TeamMember } from "@prisma/client";
 import { randomBytes } from "crypto";
+import { cache } from "react";
 
 export type TeamWithMembership = Team & {
   members: TeamMember[];
@@ -167,15 +168,17 @@ export async function listTeamsForUser(userId: string): Promise<TeamListItem[]> 
 
 /**
  * 現在選択中のチームを返す。未設定・無効なら個人チームにフォールバック。
+ * 同一リクエスト内では cache で1回だけ実行する。
  */
-export async function ensureCurrentTeam(userId: string): Promise<TeamWithMembership> {
-  const personal = await ensurePersonalTeam(userId);
-
+export const ensureCurrentTeam = cache(async function ensureCurrentTeam(
+  userId: string
+): Promise<TeamWithMembership> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { currentTeamId: true },
   });
 
+  // 通常パス: 選択中チームが有効なら個人チーム作成チェックをスキップ
   if (user?.currentTeamId) {
     const membership = await prisma.teamMember.findUnique({
       where: {
@@ -188,13 +191,14 @@ export async function ensureCurrentTeam(userId: string): Promise<TeamWithMembers
     }
   }
 
+  const personal = await ensurePersonalTeam(userId);
   await prisma.user.update({
     where: { id: userId },
     data: { currentTeamId: personal.id },
   });
 
   return personal;
-}
+});
 
 /** 作成者が owner の新規チームを作成し、現在チームに切り替える（slug は内部自動生成） */
 export async function createTeamForUser(

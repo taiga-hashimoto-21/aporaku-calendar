@@ -1,19 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 type ProfileNameFormProps = {
   initialName: string;
+  initialCompanyName: string;
   email: string;
+  onSaved?: (data: { name: string; companyName: string }) => void;
 };
 
 const LABEL_CLASS = "text-sm font-medium text-gray-700 pt-2";
 
-export function ProfileNameForm({ initialName, email }: ProfileNameFormProps) {
-  const router = useRouter();
+export function ProfileNameForm({
+  initialName,
+  initialCompanyName,
+  email,
+  onSaved,
+}: ProfileNameFormProps) {
   const [name, setName] = useState(initialName);
+  const [companyName, setCompanyName] = useState(initialCompanyName);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -24,13 +30,17 @@ export function ProfileNameForm({ initialName, email }: ProfileNameFormProps) {
       const res = await fetch("/api/account/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        credentials: "include",
+        body: JSON.stringify({ name, companyName }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "保存に失敗しました");
-      setName(data.name ?? name);
+      const nextName = data.name ?? name;
+      const nextCompanyName = data.companyName ?? companyName;
+      setName(nextName);
+      setCompanyName(nextCompanyName);
       toast.success("保存しました");
-      router.refresh();
+      onSaved?.({ name: nextName, companyName: nextCompanyName });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "保存に失敗しました");
     } finally {
@@ -60,13 +70,26 @@ export function ProfileNameForm({ initialName, email }: ProfileNameFormProps) {
           maxLength={100}
           className="w-full rounded-lg border border-border px-3 py-2 text-sm"
         />
+
+        <span className={LABEL_CLASS}>
+          会社名 <span className="text-red-500">*</span>
+        </span>
+        <input
+          type="text"
+          required
+          value={companyName}
+          onChange={(e) => setCompanyName(e.target.value)}
+          maxLength={200}
+          placeholder="株式会社〇〇"
+          className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+        />
       </div>
 
       <div className="flex justify-center pt-2">
         <button
           type="submit"
-          disabled={loading || !name.trim()}
-          className="rounded-lg border border-border bg-white px-5 py-2.5 text-sm font-medium text-gray-900 hover:bg-muted disabled:opacity-50 transition-colors"
+          disabled={loading || !name.trim() || !companyName.trim()}
+          className="cursor-pointer rounded-lg border border-border bg-white px-5 py-2.5 text-sm font-medium text-gray-900 hover:bg-muted disabled:opacity-50 transition-colors"
         >
           {loading ? "保存中..." : "変更を保存する"}
         </button>

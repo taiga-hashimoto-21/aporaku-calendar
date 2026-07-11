@@ -17,6 +17,8 @@ model User {
   email         String    @unique
   emailVerified DateTime?
   image         String?
+  /// ホスト側の会社名（プロフィール / 文面 {ホスト会社名}）
+  companyName   String?
   /// 個人チームの slug と同期（後方互換）
   teamSlug      String    @unique
   /// ヘッダーで選択中のチーム
@@ -362,4 +364,22 @@ model WebhookEndpoint {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// 管理者: 予約完了メール文面（全アカウント共通・プレーンテキスト）
+// ---------------------------------------------------------------------------
+
+/// key: guest / host（経路の違いは {経由} 変数で表現）
+model BookingEmailTemplate {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  channel   String   @default("all") // 互換のため残置（実質 all 固定）
+  audience  String // guest | host
+  subject   String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([audience])
 }

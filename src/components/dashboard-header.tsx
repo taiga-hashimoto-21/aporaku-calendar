@@ -1,21 +1,23 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
 import { TeamSwitcher } from "@/components/team-switcher";
 
 type DashboardHeaderProps = {
   userName: string;
   userImage: string | null | undefined;
-  signOutAction: () => void;
+  onSignOut: () => void;
   currentTeam: { id: string; name: string };
+  onTeamChange?: (team: { id: string; name: string }) => void;
 };
 
 export function DashboardHeader({
   userName,
   userImage,
-  signOutAction,
+  onSignOut,
   currentTeam,
+  onTeamChange,
 }: DashboardHeaderProps) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -36,18 +38,19 @@ export function DashboardHeader({
     <header className="sticky top-0 z-50 border-b border-border bg-white">
       <div className="mx-auto max-w-5xl px-6 py-4 flex items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
-          <Link href="/dashboard" className="shrink-0 hover:opacity-80 transition-opacity">
+          <Link to="/dashboard" className="shrink-0 hover:opacity-80 transition-opacity">
             <span className="text-sm font-semibold text-gray-900">日程調整アプリ</span>
           </Link>
           <TeamSwitcher
             initialCurrentTeamId={currentTeam.id}
             initialCurrentTeamName={currentTeam.name}
+            onTeamChange={onTeamChange}
           />
         </div>
 
         <div className="flex items-center gap-4 shrink-0">
           <Link
-            href="/dashboard"
+            to="/dashboard"
             className="text-sm text-gray-600 hover:text-gray-900 transition-colors"
           >
             ホーム
@@ -84,22 +87,24 @@ export function DashboardHeader({
                 className="absolute right-0 top-full mt-1 w-40 rounded-lg border border-border bg-white py-1 shadow-md z-50"
               >
                 <Link
-                  href="/account/profile"
+                  to="/account/profile"
                   role="menuitem"
                   onClick={() => setOpen(false)}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-muted transition-colors"
                 >
                   アカウント設定
                 </Link>
-                <form action={signOutAction}>
-                  <button
-                    type="submit"
-                    role="menuitem"
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-muted transition-colors"
-                  >
-                    ログアウト
-                  </button>
-                </form>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setOpen(false);
+                    onSignOut();
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-muted transition-colors"
+                >
+                  ログアウト
+                </button>
               </div>
             )}
           </div>

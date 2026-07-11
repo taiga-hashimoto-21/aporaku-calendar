@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 type TeamItem = {
@@ -14,13 +13,22 @@ type TeamItem = {
 type TeamSwitcherProps = {
   initialCurrentTeamId: string;
   initialCurrentTeamName: string;
+  onTeamChange?: (team: { id: string; name: string; calendarCount?: number }) => void;
 };
+
+function notifyTeamChanged(
+  team: { id: string; name: string; calendarCount?: number },
+  onTeamChange?: TeamSwitcherProps["onTeamChange"]
+) {
+  onTeamChange?.(team);
+  window.dispatchEvent(new CustomEvent("team-changed", { detail: team }));
+}
 
 export function TeamSwitcher({
   initialCurrentTeamId,
   initialCurrentTeamName,
+  onTeamChange,
 }: TeamSwitcherProps) {
-  const router = useRouter();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -32,7 +40,7 @@ export function TeamSwitcher({
 
   const loadTeams = useCallback(async () => {
     try {
-      const res = await fetch("/api/teams");
+      const res = await fetch("/api/teams", { credentials: "include" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "チームの取得に失敗しました");
       const nextTeams: TeamItem[] = data.teams ?? [];
@@ -75,26 +83,49 @@ export function TeamSwitcher({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  async function handleSwitch(teamId: string) {
+  function handleSwitch(teamId: string) {
     if (teamId === currentTeamId || switchingId) return;
+    const team = teams.find((t) => t.id === teamId);
+    if (!team) return;
+
+    const prevId = currentTeamId;
+    const prevName = currentTeamName;
+
+    // 先にセレクトUIだけ切り替え（dashboard 再取得は API 成功後）
+    setCurrentTeamId(teamId);
+    setCurrentTeamName(team.name);
+    setOpen(false);
     setSwitchingId(teamId);
-    try {
-      const res = await fetch("/api/teams/switch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teamId }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "切り替えに失敗しました");
-      setCurrentTeamId(data.id);
-      setCurrentTeamName(data.name);
-      setOpen(false);
-      router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "切り替えに失敗しました");
-    } finally {
-      setSwitchingId(null);
-    }
+
+    void (async () => {
+      try {
+        const res = await fetch("/api/teams/switch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ teamId }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "切り替えに失敗しました");
+        setCurrentTeamId(data.id);
+        setCurrentTeamName(data.name);
+        notifyTeamChanged(
+          {
+            id: data.id,
+            name: data.name,
+            calendarCount:
+              typeof data.calendarCount === "number" ? data.calendarCount : undefined,
+          },
+          onTeamChange
+        );
+      } catch (err) {
+        setCurrentTeamId(prevId);
+        setCurrentTeamName(prevName);
+        toast.error(err instanceof Error ? err.message : "切り替えに失敗しました");
+      } finally {
+        setSwitchingId(null);
+      }
+    })();
   }
 
   function openCreateModal() {
@@ -111,7 +142,7 @@ export function TeamSwitcher({
     setCurrentTeamName(team.name);
     setModalOpen(false);
     toast.success("チームを作成しました");
-    router.refresh();
+    notifyTeamChanged({ id: team.id, name: team.name, calendarCount: 0 }, onTeamChange);
   }
 
   const displayName = currentTeamName || "チーム";
@@ -160,7 +191,7 @@ export function TeamSwitcher({
                     role="option"
                     aria-selected={selected}
                     disabled={switchingId !== null}
-                    onClick={() => void handleSwitch(team.id)}
+                    onClick={() => handleSwitch(team.id)}
                     className={`flex w-full items-center px-4 py-2 text-left text-sm transition-colors hover:bg-muted ${
                       selected ? "font-medium text-gray-900" : "text-gray-800"
                     }`}

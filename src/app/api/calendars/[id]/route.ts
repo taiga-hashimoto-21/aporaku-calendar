@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { findAccessibleCalendar } from "@/lib/team";
+import { buildPublicCalendarUrl } from "@/lib/utils";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -20,6 +21,44 @@ const updateSchema = z.object({
   participationMode: z.enum(["all", "any", "two_groups"]).optional(),
   participantIds: z.array(z.string().min(1)).optional(),
 });
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id } = await params;
+  const calendar = await findAccessibleCalendar(session.user.id, id);
+  if (!calendar) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? "http://localhost:3002";
+
+  return NextResponse.json({
+    calendar: {
+      id: calendar.id,
+      name: calendar.name,
+      description: calendar.description,
+      durationMinutes: calendar.durationMinutes,
+      bufferBeforeMinutes: calendar.bufferBeforeMinutes,
+      bufferAfterMinutes: calendar.bufferAfterMinutes,
+      meetingType: calendar.meetingType,
+      bookingWindowDays: calendar.bookingWindowDays,
+      minNoticeHours: calendar.minNoticeHours,
+      isActive: calendar.isActive,
+      weeklyAvailability: calendar.weeklyAvailability,
+      participationMode: calendar.participationMode,
+      participantIds: calendar.participants.map((p) => p.userId),
+      publicUrl: buildPublicCalendarUrl(calendar.slug, baseUrl),
+      teamId: calendar.teamId,
+    },
+  });
+}
 
 export async function PATCH(
   request: NextRequest,

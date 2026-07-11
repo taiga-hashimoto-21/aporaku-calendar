@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, useLocation } from "react-router-dom";
 
 const NAV_ITEMS = [
   { href: "/account/profile", label: "プロフィール" },
@@ -10,7 +9,7 @@ const NAV_ITEMS = [
 ] as const;
 
 export function AccountSettingsNav() {
-  const pathname = usePathname();
+  const { pathname } = useLocation();
 
   return (
     <aside className="w-44 shrink-0">
@@ -21,7 +20,7 @@ export function AccountSettingsNav() {
           return (
             <Link
               key={href}
-              href={href}
+              to={href}
               className={`block rounded-md px-3 py-2 text-sm transition-colors ${
                 active
                   ? "bg-muted text-gray-900 font-medium"

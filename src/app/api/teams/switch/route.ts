@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { switchCurrentTeam } from "@/lib/team";
 import { z } from "zod";
 
@@ -17,11 +18,15 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const parsed = switchSchema.parse(body);
     const team = await switchCurrentTeam(session.user.id, parsed.teamId);
+    const calendarCount = await prisma.schedulingCalendar.count({
+      where: { teamId: team.id },
+    });
 
     return NextResponse.json({
       id: team.id,
       name: team.name,
       slug: team.slug,
+      calendarCount,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
