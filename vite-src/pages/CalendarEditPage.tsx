@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { AccountSettingsSection } from "@/components/account-settings-section";
-import { CalendarEditForm } from "@/components/calendar-edit-form";
+import {
+  CalendarEditForm,
+  type CalendarEditFormCalendar,
+} from "@/components/calendar-edit-form";
 import type { ParticipationModeValue } from "@/components/calendar-participant-settings";
+import { CalendarCreatePageSkeleton } from "../components/CalendarCreatePageSkeleton";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 
@@ -15,22 +18,10 @@ type MemberOption = {
 };
 
 type CalendarResponse = {
-  calendar: {
-    id: string;
-    name: string;
-    description: string | null;
-    durationMinutes: number;
-    bufferBeforeMinutes: number;
-    bufferAfterMinutes: number;
-    meetingType: "none" | "zoom" | "google_meet";
-    bookingWindowDays: number;
-    minNoticeHours: number;
-    isActive: boolean;
-    weeklyAvailability: unknown;
-    participationMode: ParticipationModeValue;
-    participantIds: string[];
+  calendar: CalendarEditFormCalendar & {
     publicUrl: string;
     teamId: string;
+    participationMode: ParticipationModeValue;
   };
 };
 
@@ -42,22 +33,6 @@ type MembersResponse = {
     image: string | null;
   }>;
 };
-
-function PageLoading() {
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="h-8 w-40 rounded shimmer" />
-      </div>
-      <div className="rounded-lg bg-white p-6 space-y-4">
-        <div className="h-4 w-3/4 max-w-md rounded shimmer" />
-        <div className="h-10 w-full rounded shimmer" />
-        <div className="h-10 w-full rounded shimmer" />
-        <div className="h-32 w-full rounded shimmer" />
-      </div>
-    </div>
-  );
-}
 
 export function CalendarEditPage() {
   const { id } = useParams<{ id: string }>();
@@ -118,40 +93,44 @@ export function CalendarEditPage() {
   }, [id]);
 
   if (loading || !user) {
-    return <PageLoading />;
+    return <CalendarCreatePageSkeleton title="カレンダー編集" submitLabel="変更を保存する" />;
   }
 
   if (notFound || !calendar) {
     return (
-      <AccountSettingsSection title="カレンダー編集">
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">カレンダー編集</h1>
+        </div>
         <p className="text-sm text-gray-600">カレンダーが見つかりませんでした。</p>
-      </AccountSettingsSection>
+      </div>
     );
   }
 
   return (
-    <AccountSettingsSection title="カレンダー編集">
-      <CalendarEditForm
-        calendar={{
-          id: calendar.id,
-          name: calendar.name,
-          description: calendar.description,
-          durationMinutes: calendar.durationMinutes,
-          bufferBeforeMinutes: calendar.bufferBeforeMinutes,
-          bufferAfterMinutes: calendar.bufferAfterMinutes,
-          meetingType: calendar.meetingType,
-          bookingWindowDays: calendar.bookingWindowDays,
-          minNoticeHours: calendar.minNoticeHours,
-          isActive: calendar.isActive,
-          weeklyAvailability: calendar.weeklyAvailability,
-          participationMode: calendar.participationMode,
-          participantIds: calendar.participantIds,
-        }}
-        members={members}
-        currentUserId={user.id}
-        publicUrl={calendar.publicUrl}
-        justCreated={justCreated}
-      />
-    </AccountSettingsSection>
+    <CalendarEditForm
+      calendar={{
+        id: calendar.id,
+        name: calendar.name,
+        privateName: calendar.privateName,
+        description: calendar.description,
+        durationMinutes: calendar.durationMinutes,
+        bufferBeforeMinutes: calendar.bufferBeforeMinutes,
+        bufferAfterMinutes: calendar.bufferAfterMinutes,
+        meetingType: calendar.meetingType,
+        bookingWindowDays: calendar.bookingWindowDays,
+        minNoticeHours: calendar.minNoticeHours,
+        isActive: calendar.isActive,
+        timezone: calendar.timezone,
+        acceptHolidayBookings: calendar.acceptHolidayBookings,
+        weeklyAvailability: calendar.weeklyAvailability,
+        dateOverrides: calendar.dateOverrides,
+        participationMode: calendar.participationMode,
+        participantIds: calendar.participantIds,
+      }}
+      members={members}
+      currentUserId={user.id}
+      justCreated={justCreated}
+    />
   );
 }

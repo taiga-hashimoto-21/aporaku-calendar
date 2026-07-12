@@ -54,13 +54,17 @@ export function emailToTeamSlug(email: string): string {
   );
 }
 
+/** 公開予約ページのベース URL（共有・コピー用。ローカルでも本番ドメインを使う） */
+export function getPublicCalendarBaseUrl(): string {
+  return (
+    process.env.PUBLIC_CALENDAR_BASE_URL ??
+    process.env.NEXT_PUBLIC_CALENDAR_BASE_URL ??
+    "https://calendar-app.me"
+  ).replace(/\/$/, "");
+}
+
 /** 公開予約ページの URL を生成 */
 export function buildPublicCalendarUrl(slug: string, baseUrl?: string): string {
-  const base = (
-    baseUrl ??
-    process.env.NEXTAUTH_URL ??
-    process.env.AUTH_URL ??
-    "http://localhost:3002"
-  ).replace(/\/$/, "");
+  const base = (baseUrl ?? getPublicCalendarBaseUrl()).replace(/\/$/, "");
   return `${base}/${slug}`;
 }

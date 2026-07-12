@@ -10,7 +10,8 @@ const NAV_ITEMS_TEAM = [
 
 const NAV_ITEMS_ACCOUNT = [
   { href: "/account/profile", label: "プロフィール" },
-  { href: "/account/calendar", label: "連携カレンダー" },
+  // 一旦非表示。後で復活させる可能性あり
+  // { href: "/account/calendar", label: "連携カレンダー" },
   { href: "/account/integrations", label: "サービス連携" },
 ] as const;
 

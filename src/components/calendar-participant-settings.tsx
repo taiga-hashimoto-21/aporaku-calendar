@@ -108,7 +108,7 @@ export function CalendarParticipantSettings({
               key={opt.value}
               type="button"
               onClick={() => setMode(opt.value)}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+              className={`cursor-pointer rounded-md px-4 py-2 text-sm font-medium transition-colors ${
                 active
                   ? "bg-primary-light text-primary"
                   : "text-gray-700 hover:bg-muted"
@@ -136,7 +136,7 @@ export function CalendarParticipantSettings({
                   <button
                     type="button"
                     onClick={() => removeParticipant(m.userId)}
-                    className="rounded-full p-0.5 text-gray-400 hover:text-gray-700"
+                    className="cursor-pointer rounded-full p-0.5 text-gray-400 hover:text-gray-700"
                     aria-label={`${label}を外す`}
                   >
                     <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
@@ -165,7 +165,7 @@ export function CalendarParticipantSettings({
                   key={m.userId}
                   type="button"
                   onClick={() => addParticipant(m.userId)}
-                  className="inline-flex items-center rounded-full border border-border bg-white px-2.5 py-1 text-sm text-gray-900 hover:border-primary hover:bg-primary-light hover:text-primary transition-colors"
+                  className="inline-flex cursor-pointer items-center rounded-full border border-border bg-white px-2.5 py-1 text-sm text-gray-900 hover:border-primary hover:bg-primary-light hover:text-primary transition-colors"
                 >
                   {label}
                 </button>

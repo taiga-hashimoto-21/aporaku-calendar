@@ -25,7 +25,6 @@ export default async function DashboardPage() {
     },
   });
 
-  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3002";
   const hasCalendars = calendars.length > 0;
 
   return (
@@ -61,7 +60,7 @@ export default async function DashboardPage() {
           calendars={calendars.map((cal) => ({
             id: cal.id,
             name: cal.name,
-            publicUrl: buildPublicCalendarUrl(cal.slug, baseUrl),
+            publicUrl: buildPublicCalendarUrl(cal.slug),
             durationMinutes: cal.durationMinutes,
             meetingType: cal.meetingType,
             isActive: cal.isActive,

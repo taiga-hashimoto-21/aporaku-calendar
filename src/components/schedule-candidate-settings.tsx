@@ -203,7 +203,7 @@ function BinarySegment<T extends string>({
           key={option.value}
           type="button"
           onClick={() => onChange(option.value)}
-          className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+          className={`cursor-pointer rounded-md px-4 py-2 text-sm font-medium transition-colors ${
             value === option.value
               ? "bg-primary-light text-primary"
               : "text-gray-700 hover:bg-muted"
@@ -285,7 +285,7 @@ function DayScheduleModal({
             type="button"
             aria-label="閉じる"
             onClick={onClose}
-            className="rounded p-1 text-gray-500 hover:bg-muted hover:text-gray-800 transition-colors"
+            className="cursor-pointer rounded p-1 text-gray-500 hover:bg-muted hover:text-gray-800 transition-colors"
           >
             <CloseIcon />
           </button>
@@ -320,7 +320,7 @@ function DayScheduleModal({
                     aria-label="時間帯を削除"
                     onClick={() => removeSlot(index)}
                     disabled={draft.slots.length <= 1}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-red-400 bg-white text-red-500 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-border disabled:text-gray-400 disabled:hover:bg-white transition-colors"
+                    className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-red-400 bg-white text-red-500 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-border disabled:text-gray-400 disabled:hover:bg-white transition-colors"
                   >
                     <TrashIcon />
                   </button>
@@ -328,7 +328,7 @@ function DayScheduleModal({
                     type="button"
                     aria-label="時間帯を追加"
                     onClick={() => addSlotAfter(index)}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-primary bg-white text-primary hover:bg-primary-light transition-colors"
+                    className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-primary bg-white text-primary hover:bg-primary-light transition-colors"
                   >
                     <PlusIcon />
                   </button>
@@ -359,8 +359,8 @@ function DayScheduleModal({
                       isCurrent
                         ? "cursor-default bg-muted text-gray-400"
                         : selected
-                          ? "bg-primary-light text-primary"
-                          : "bg-white text-gray-700 hover:bg-muted/50"
+                          ? "cursor-pointer bg-primary-light text-primary"
+                          : "cursor-pointer bg-white text-gray-700 hover:bg-muted/50"
                     }`}
                   >
                     {day.label}
@@ -375,14 +375,14 @@ function DayScheduleModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-muted transition-colors"
+            className="cursor-pointer rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-muted transition-colors"
           >
             キャンセル
           </button>
           <button
             type="button"
             onClick={onSave}
-            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover transition-colors"
+            className="cursor-pointer rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover transition-colors"
           >
             保存する
           </button>

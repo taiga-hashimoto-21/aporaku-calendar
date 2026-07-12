@@ -37,6 +37,7 @@ const createSchema = z.object({
   minNoticeHours: z.number().int().min(0).max(168).default(12),
   participationMode: z.enum(["all", "any", "two_groups"]).default("all"),
   participantIds: z.array(z.string().min(1)).default([]),
+  meetingType: z.enum(["none", "zoom", "google_meet"]).default("none"),
 });
 
 export async function GET() {
@@ -51,12 +52,10 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
   });
 
-  const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? "http://localhost:3002";
-
   return NextResponse.json({
     calendars: calendars.map((cal) => ({
       ...cal,
-      publicUrl: buildPublicCalendarUrl(cal.slug, baseUrl),
+      publicUrl: buildPublicCalendarUrl(cal.slug),
     })),
   });
 }
@@ -106,7 +105,7 @@ export async function POST(request: NextRequest) {
         acceptHolidayBookings: parsed.acceptHolidayBookings,
         bookingWindowDays: parsed.bookingWindowDays,
         minNoticeHours: parsed.minNoticeHours,
-        meetingType: "none",
+        meetingType: parsed.meetingType,
         participationMode: parsed.participationMode,
         participants: {
           create: participantIds.map((userId) => ({ userId })),

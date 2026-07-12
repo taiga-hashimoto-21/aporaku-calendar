@@ -72,7 +72,7 @@ export function PresetSelectField({
           aria-haspopup="listbox"
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
-          className={`flex w-full items-center justify-between rounded-lg border bg-white px-3 py-2 text-left text-sm text-gray-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
+          className={`flex w-full cursor-pointer items-center justify-between rounded-lg border bg-white px-3 py-2 text-left text-sm text-gray-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 ${
             error ? "border-red-500" : open ? "border-primary" : "border-border"
           }`}
         >
@@ -103,7 +103,7 @@ export function PresetSelectField({
                       onSelectPreset(option.value);
                       setOpen(false);
                     }}
-                    className={`block w-full px-3 py-2 text-left text-sm transition-colors ${
+                    className={`block w-full cursor-pointer px-3 py-2 text-left text-sm transition-colors ${
                       selected
                         ? "bg-gray-100 text-gray-900"
                         : "text-gray-800 hover:bg-gray-50"
@@ -121,7 +121,7 @@ export function PresetSelectField({
                   onSelectCustom();
                   setOpen(false);
                 }}
-                className={`block w-full px-3 py-2 text-left text-sm transition-colors ${
+                className={`block w-full cursor-pointer px-3 py-2 text-left text-sm transition-colors ${
                   mode === "custom"
                     ? "bg-gray-100 text-gray-900"
                     : "text-gray-800 hover:bg-gray-50"

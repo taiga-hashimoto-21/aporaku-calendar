@@ -42,7 +42,7 @@ function CalendarListRowSkeleton() {
           <div className="h-4 w-56 max-w-[70%] rounded shimmer" />
           <span className="shrink-0 text-xs font-medium text-gray-600">コピー</span>
         </div>
-        <div className="h-3 w-28 rounded shimmer" />
+        <div className="h-3 w-36 rounded shimmer" />
       </div>
       <span className="shrink-0 text-sm text-primary">編集</span>
     </li>

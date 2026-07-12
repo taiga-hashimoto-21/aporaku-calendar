@@ -17,7 +17,18 @@ const updateSchema = z.object({
   bookingWindowDays: z.number().int().min(1).max(365).optional(),
   minNoticeHours: z.number().int().min(0).max(168).optional(),
   isActive: z.boolean().optional(),
+  timezone: z.string().min(1).max(100).optional(),
+  acceptHolidayBookings: z.boolean().optional(),
   weeklyAvailability: z.record(z.array(z.object({ start: z.string(), end: z.string() }))).optional(),
+  dateOverrides: z
+    .array(
+      z.object({
+        date: z.string(),
+        slots: z.array(z.object({ start: z.string(), end: z.string() })),
+        closed: z.boolean().optional(),
+      })
+    )
+    .optional(),
   participationMode: z.enum(["all", "any", "two_groups"]).optional(),
   participantIds: z.array(z.string().min(1)).optional(),
 });
@@ -37,12 +48,11 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? "http://localhost:3002";
-
   return NextResponse.json({
     calendar: {
       id: calendar.id,
       name: calendar.name,
+      privateName: calendar.privateName,
       description: calendar.description,
       durationMinutes: calendar.durationMinutes,
       bufferBeforeMinutes: calendar.bufferBeforeMinutes,
@@ -51,10 +61,13 @@ export async function GET(
       bookingWindowDays: calendar.bookingWindowDays,
       minNoticeHours: calendar.minNoticeHours,
       isActive: calendar.isActive,
+      timezone: calendar.timezone,
+      acceptHolidayBookings: calendar.acceptHolidayBookings,
       weeklyAvailability: calendar.weeklyAvailability,
+      dateOverrides: calendar.dateOverrides,
       participationMode: calendar.participationMode,
       participantIds: calendar.participants.map((p) => p.userId),
-      publicUrl: buildPublicCalendarUrl(calendar.slug, baseUrl),
+      publicUrl: buildPublicCalendarUrl(calendar.slug),
       teamId: calendar.teamId,
     },
   });
@@ -84,7 +97,15 @@ export async function PATCH(
     const calendar = await prisma.$transaction(async (tx) => {
       const updated = await tx.schedulingCalendar.update({
         where: { id },
-        data: calendarData,
+        data: {
+          ...calendarData,
+          ...(calendarData.weeklyAvailability !== undefined
+            ? { weeklyAvailability: calendarData.weeklyAvailability as object }
+            : {}),
+          ...(calendarData.dateOverrides !== undefined
+            ? { dateOverrides: calendarData.dateOverrides as object }
+            : {}),
+        },
       });
 
       if (participantIds !== undefined) {

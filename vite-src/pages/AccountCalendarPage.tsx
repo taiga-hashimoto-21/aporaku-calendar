@@ -13,7 +13,6 @@ type IntegrationsResponse = {
   googleEmail: string | null;
   googleCalendarId: string;
   zoomConnected: boolean;
-  aporakuUserId: string | null;
 };
 
 type CalendarItem = {

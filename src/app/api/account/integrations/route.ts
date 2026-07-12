@@ -23,7 +23,7 @@ export async function GET() {
     }),
     prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { aporakuUserId: true, email: true },
+      select: { email: true },
     }),
   ]);
 
@@ -32,6 +32,5 @@ export async function GET() {
     googleEmail: googleAccount ? (user?.email ?? session.user.email ?? null) : null,
     googleCalendarId: googleConnection?.calendarId ?? "primary",
     zoomConnected: Boolean(zoom),
-    aporakuUserId: user?.aporakuUserId ?? null,
   });
 }

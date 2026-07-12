@@ -38,6 +38,27 @@ body {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
+/* クリック可能なボタンはポインター（disabled は not-allowed） */
+button:not(:disabled),
+[type="button"]:not(:disabled),
+[type="submit"]:not(:disabled),
+[type="reset"]:not(:disabled),
+[role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}
+
+button:disabled,
+[type="button"]:disabled,
+[type="submit"]:disabled,
+[type="reset"]:disabled {
+  cursor: not-allowed;
+}
+
+/* 公開予約ページ（Google 予約ページに合わせる） */
+.font-public-booking {
+  font-family: "Google Sans", var(--font-roboto), Roboto, Arial, sans-serif;
+}
+
 /* sonner: 右から入って右へ消える + 文言幅にフィット（1行） */
 [data-sonner-toaster].app-toaster {
   width: auto !important;

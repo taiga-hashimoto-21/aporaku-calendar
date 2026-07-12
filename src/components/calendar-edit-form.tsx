@@ -1,33 +1,134 @@
 "use client";
 
-import { useState } from "react";
-import { CalendarShareLink } from "@/components/calendar-share-link";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+import { PresetSelectField } from "@/components/preset-select-field";
+import {
+  ScheduleCandidateSettings,
+  createDefaultScheduleCandidateSettings,
+} from "@/components/schedule-candidate-settings";
 import {
   CalendarParticipantSettings,
   type CalendarParticipantSettingsValue,
   type ParticipantMemberOption,
   type ParticipationModeValue,
 } from "@/components/calendar-participant-settings";
+import {
+  MIN_NOTICE_OPTIONS,
+  resolveScheduleCandidateSettings,
+  type PresetMode,
+  type ScheduleCandidateSettingsValue,
+} from "@/lib/schedule-candidate-settings";
+import type { DateOverride, WeeklyAvailability } from "@/types/calendar";
+
+const DURATION_OPTIONS = [
+  { value: 15, label: "15 分" },
+  { value: 30, label: "30 分" },
+  { value: 45, label: "45 分" },
+  { value: 60, label: "1 時間" },
+  { value: 90, label: "1.5 時間" },
+  { value: 120, label: "2 時間" },
+] as const;
+
+type MeetingTypeValue = "none" | "zoom" | "google_meet";
+
+const MEETING_TYPE_OPTIONS: Array<{ value: MeetingTypeValue; label: string }> = [
+  { value: "none", label: "利用しない" },
+  { value: "zoom", label: "Zoom" },
+  { value: "google_meet", label: "Google Meet" },
+];
+
+const FORM_LABEL_CLASS = "text-sm font-medium text-gray-700 pt-2";
+
+function FormLabel({
+  htmlFor,
+  children,
+}: {
+  htmlFor?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label htmlFor={htmlFor} className={FORM_LABEL_CLASS}>
+      {children}
+    </label>
+  );
+}
+
+function isWeeklyAvailability(value: unknown): value is WeeklyAvailability {
+  if (!value || typeof value !== "object") return false;
+  const days = [
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+  ] as const;
+  return days.every((day) => Array.isArray((value as Record<string, unknown>)[day]));
+}
+
+function buildInitialScheduleSettings(calendar: {
+  weeklyAvailability: unknown;
+  timezone: string;
+  acceptHolidayBookings: boolean;
+  minNoticeHours: number;
+}): ScheduleCandidateSettingsValue {
+  const defaults = createDefaultScheduleCandidateSettings();
+  const isPreset = MIN_NOTICE_OPTIONS.some(
+    (option) => option.value === calendar.minNoticeHours
+  );
+  return {
+    weeklyAvailability: isWeeklyAvailability(calendar.weeklyAvailability)
+      ? calendar.weeklyAvailability
+      : defaults.weeklyAvailability,
+    timezone: calendar.timezone || defaults.timezone,
+    acceptHolidayBookings: calendar.acceptHolidayBookings,
+    minNoticeHours: calendar.minNoticeHours,
+    minNoticeMode: isPreset ? "preset" : "custom",
+  };
+}
+
+function buildInitialDuration(durationMinutes: number): {
+  mode: PresetMode;
+  minutes: number;
+  customValue: string;
+} {
+  const preset = DURATION_OPTIONS.find((option) => option.value === durationMinutes);
+  if (preset) {
+    return { mode: "preset", minutes: preset.value, customValue: "" };
+  }
+  return {
+    mode: "custom",
+    minutes: 30,
+    customValue: String(durationMinutes),
+  };
+}
+
+export type CalendarEditFormCalendar = {
+  id: string;
+  name: string;
+  privateName: string | null;
+  description: string | null;
+  durationMinutes: number;
+  bufferBeforeMinutes: number;
+  bufferAfterMinutes: number;
+  meetingType: MeetingTypeValue;
+  bookingWindowDays: number;
+  minNoticeHours: number;
+  isActive: boolean;
+  timezone: string;
+  acceptHolidayBookings: boolean;
+  weeklyAvailability: unknown;
+  dateOverrides: unknown;
+  participationMode: ParticipationModeValue;
+  participantIds: string[];
+};
 
 interface CalendarEditFormProps {
-  calendar: {
-    id: string;
-    name: string;
-    description: string | null;
-    durationMinutes: number;
-    bufferBeforeMinutes: number;
-    bufferAfterMinutes: number;
-    meetingType: "none" | "zoom" | "google_meet";
-    bookingWindowDays: number;
-    minNoticeHours: number;
-    isActive: boolean;
-    weeklyAvailability: unknown;
-    participationMode: ParticipationModeValue;
-    participantIds: string[];
-  };
+  calendar: CalendarEditFormCalendar;
   members: ParticipantMemberOption[];
   currentUserId: string;
-  publicUrl: string;
   justCreated?: boolean;
   onSaved?: () => void;
 }
@@ -36,31 +137,110 @@ export function CalendarEditForm({
   calendar,
   members,
   currentUserId,
-  publicUrl,
   justCreated = false,
   onSaved,
 }: CalendarEditFormProps) {
-  const [form, setForm] = useState(calendar);
+  const initialDuration = buildInitialDuration(calendar.durationMinutes);
+
+  const [name, setName] = useState(calendar.name);
+  const [usePrivateName, setUsePrivateName] = useState(Boolean(calendar.privateName));
+  const [privateName, setPrivateName] = useState(calendar.privateName ?? "");
+  const [durationMode, setDurationMode] = useState<PresetMode>(initialDuration.mode);
+  const [durationMinutes, setDurationMinutes] = useState<number>(initialDuration.minutes);
+  const [customDuration, setCustomDuration] = useState(initialDuration.customValue);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [scheduleSettings, setScheduleSettings] = useState<ScheduleCandidateSettingsValue>(
+    () => buildInitialScheduleSettings(calendar)
+  );
   const [participantSettings, setParticipantSettings] =
     useState<CalendarParticipantSettingsValue>({
-      mode: calendar.participationMode,
+      mode: calendar.participationMode === "any" ? "any" : "all",
       participantIds:
         calendar.participantIds.length > 0 ? calendar.participantIds : [currentUserId],
     });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [meetingType, setMeetingType] = useState<MeetingTypeValue>(calendar.meetingType);
+  const [zoomConnected, setZoomConnected] = useState<boolean | null>(null);
+
+  const loadZoomConnection = useCallback(async () => {
+    try {
+      const res = await fetch("/api/account/integrations", { credentials: "include" });
+      if (!res.ok) return;
+      const data = (await res.json()) as { zoomConnected?: boolean };
+      setZoomConnected(Boolean(data.zoomConnected));
+    } catch {
+      // 連携状態の取得失敗時は警告を出さない
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadZoomConnection();
+  }, [loadZoomConnection]);
+
+  useEffect(() => {
+    if (meetingType !== "zoom") return;
+
+    function onVisible() {
+      if (document.visibilityState === "visible") {
+        void loadZoomConnection();
+      }
+    }
+
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [meetingType, loadZoomConnection]);
+
+  function validate() {
+    const next: Record<string, string> = {};
+
+    if (!name.trim()) {
+      next.name = "カレンダー名の入力が必須です。";
+    }
+    if (usePrivateName && !privateName.trim()) {
+      next.privateName = "非公開カレンダー名の入力が必須です。";
+    }
+    if (durationMode === "custom") {
+      const value = Number(customDuration);
+      if (!Number.isFinite(value) || value < 5 || value > 480) {
+        next.duration = "5〜480分の範囲で入力してください。";
+      }
+    }
+    if (scheduleSettings.minNoticeMode === "custom") {
+      if (
+        !Number.isFinite(scheduleSettings.minNoticeHours) ||
+        scheduleSettings.minNoticeHours < 0 ||
+        scheduleSettings.minNoticeHours > 168
+      ) {
+        next.minNoticeHours = "0〜168時間の範囲で入力してください。";
+      }
+    }
+
+    setFieldErrors(next);
+    return Object.keys(next).length === 0;
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!validate()) return;
+
     setLoading(true);
     setError(null);
-    setSaved(false);
 
+    const resolvedDuration =
+      durationMode === "custom" ? Number(customDuration) : durationMinutes;
+    const resolvedSchedule = resolveScheduleCandidateSettings(scheduleSettings);
     const participantIds =
       participantSettings.participantIds.length > 0
         ? participantSettings.participantIds
         : [currentUserId];
+    const dateOverrides = Array.isArray(calendar.dateOverrides)
+      ? (calendar.dateOverrides as DateOverride[])
+      : resolvedSchedule.dateOverrides;
 
     try {
       const res = await fetch(`/api/calendars/${calendar.id}`, {
@@ -68,20 +248,23 @@ export function CalendarEditForm({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          name: form.name,
-          description: form.description,
-          durationMinutes: form.durationMinutes,
-          meetingType: form.meetingType,
-          bookingWindowDays: form.bookingWindowDays,
-          minNoticeHours: form.minNoticeHours,
-          isActive: form.isActive,
+          name: name.trim(),
+          privateName: usePrivateName ? privateName.trim() : null,
+          durationMinutes: resolvedDuration,
+          timezone: resolvedSchedule.timezone,
+          weeklyAvailability: resolvedSchedule.weeklyAvailability,
+          dateOverrides,
+          acceptHolidayBookings: resolvedSchedule.acceptHolidayBookings,
+          minNoticeHours: resolvedSchedule.minNoticeHours,
+          bookingWindowDays: calendar.bookingWindowDays || resolvedSchedule.bookingWindowDays,
           participationMode: participantSettings.mode,
           participantIds,
+          meetingType,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "保存に失敗しました");
-      setSaved(true);
+      toast.success("保存しました");
       onSaved?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存に失敗しました");
@@ -91,115 +274,147 @@ export function CalendarEditForm({
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <div className="overflow-hidden rounded-lg border border-border bg-white px-6 py-5 space-y-3">
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">カレンダー編集</h1>
         {justCreated && (
-          <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+          <p className="mt-2 text-sm text-green-700">
             カレンダーを作成しました。予約リンクを共有できます。
           </p>
         )}
-        <CalendarShareLink url={publicUrl} />
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Field label="カレンダー名" required>
-          <input
-            type="text"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-            required
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm"
-          />
-        </Field>
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <section className="space-y-3">
+          <div className="overflow-hidden rounded-lg border border-border bg-white divide-y divide-border">
+            <div className="grid grid-cols-[8.5rem_1fr] items-start gap-x-4 px-6 py-5">
+              <FormLabel htmlFor="calendar-name">
+                カレンダー名<span className="text-red-500 ml-0.5">*</span>
+              </FormLabel>
+              <div className="space-y-2">
+                <input
+                  id="calendar-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="カレンダー名"
+                  className={inputClass(fieldErrors.name)}
+                />
+                {fieldErrors.name && (
+                  <p className="text-sm text-red-600">{fieldErrors.name}</p>
+                )}
 
-        <Field label="説明">
-          <textarea
-            value={form.description ?? ""}
-            onChange={(e) => setForm({ ...form, description: e.target.value || null })}
-            rows={3}
-            className="w-full rounded-lg border border-border px-3 py-2 text-sm"
-          />
-        </Field>
+                <OptionalCheckboxField
+                  id="use-private-name"
+                  enabled={usePrivateName}
+                  onEnabledChange={setUsePrivateName}
+                  label="非公開カレンダー名を設定する"
+                  error={fieldErrors.privateName}
+                >
+                  <input
+                    type="text"
+                    value={privateName}
+                    onChange={(e) => setPrivateName(e.target.value)}
+                    placeholder="テストカレンダー"
+                    className={inputClass(fieldErrors.privateName)}
+                  />
+                </OptionalCheckboxField>
+              </div>
+            </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="1枠の時間（分）">
-            <select
-              value={form.durationMinutes}
-              onChange={(e) => setForm({ ...form, durationMinutes: Number(e.target.value) })}
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm"
-            >
-              {[15, 30, 45, 60, 90].map((m) => (
-                <option key={m} value={m}>
-                  {m}分
-                </option>
-              ))}
-            </select>
-          </Field>
+            <div className="grid grid-cols-[8.5rem_1fr] items-start gap-x-4 px-6 py-5">
+              <FormLabel htmlFor="duration-select">
+                所要時間<span className="text-red-500 ml-0.5">*</span>
+              </FormLabel>
+              <DurationSelectField
+                id="duration-select"
+                mode={durationMode}
+                minutes={durationMinutes}
+                customValue={customDuration}
+                error={fieldErrors.duration}
+                onSelectPreset={(minutes) => {
+                  setDurationMode("preset");
+                  setDurationMinutes(minutes);
+                }}
+                onSelectCustom={() => setDurationMode("custom")}
+                onCustomChange={(value) => {
+                  setCustomDuration(value);
+                  setDurationMode("custom");
+                }}
+              />
+            </div>
 
-          <Field label="Web会議">
-            <select
-              value={form.meetingType}
-              onChange={(e) =>
-                setForm({ ...form, meetingType: e.target.value as typeof form.meetingType })
-              }
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm"
-            >
-              <option value="none">なし</option>
-              <option value="google_meet">Google Meet</option>
-              <option value="zoom">Zoom</option>
-            </select>
-          </Field>
-        </div>
+            <div className="grid grid-cols-[8.5rem_1fr] items-start gap-x-4 px-6 py-5">
+              <FormLabel>参加メンバー設定</FormLabel>
+              <CalendarParticipantSettings
+                members={members}
+                value={participantSettings}
+                onChange={setParticipantSettings}
+                fallbackUserId={currentUserId}
+              />
+            </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="予約可能日数（先）">
-            <input
-              type="number"
-              min={1}
-              max={365}
-              value={form.bookingWindowDays}
-              onChange={(e) => setForm({ ...form, bookingWindowDays: Number(e.target.value) })}
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm"
-            />
-          </Field>
-          <Field label="最短予約（時間前）">
-            <input
-              type="number"
-              min={0}
-              max={168}
-              value={form.minNoticeHours}
-              onChange={(e) => setForm({ ...form, minNoticeHours: Number(e.target.value) })}
-              className="w-full rounded-lg border border-border px-3 py-2 text-sm"
-            />
-          </Field>
-        </div>
+            <div className="grid grid-cols-[8.5rem_1fr] items-start gap-x-4 px-6 py-5">
+              <FormLabel>Web会議設定</FormLabel>
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600">
+                  日程調整完了時に Web 会議 URL の発行を自動で行います。
+                </p>
+                <div className="inline-flex rounded-lg border border-border p-0.5">
+                  {MEETING_TYPE_OPTIONS.map((opt) => {
+                    const active = meetingType === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setMeetingType(opt.value)}
+                        className={`cursor-pointer rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                          active
+                            ? "bg-primary-light text-primary"
+                            : "text-gray-700 hover:bg-muted"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {meetingType === "zoom" && zoomConnected === false && (
+                  <p className="text-sm text-gray-600">
+                    参加メンバーはZoomと連携されていません。{" "}
+                    <a
+                      href="/account/integrations"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline underline-offset-2 hover:opacity-80"
+                    >
+                      Zoom連携について
+                    </a>
+                  </p>
+                )}
+              </div>
+            </div>
 
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={form.isActive}
-            onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-          />
-          公開する
-        </label>
-
-        <div className="grid grid-cols-[8.5rem_1fr] items-start gap-x-4 rounded-lg border border-border bg-white px-4 py-4">
-          <span className="text-sm font-medium text-gray-700 pt-2">参加メンバー設定</span>
-          <CalendarParticipantSettings
-            members={members}
-            value={participantSettings}
-            onChange={setParticipantSettings}
-          />
-        </div>
+            <div className="grid grid-cols-[8.5rem_1fr] items-start gap-x-4 px-6 py-5">
+              <FormLabel>日程候補設定</FormLabel>
+              <div className="space-y-2">
+                <ScheduleCandidateSettings
+                  value={scheduleSettings}
+                  onChange={setScheduleSettings}
+                  minNoticeError={fieldErrors.minNoticeHours}
+                />
+              </div>
+            </div>
+          </div>
+        </section>
 
         {error && <p className="text-sm text-red-600">{error}</p>}
-        {saved && <p className="text-sm text-green-600">保存しました</p>}
 
         <div className="flex justify-center pt-2">
           <button
             type="submit"
             disabled={loading}
-            className="rounded-lg border border-border bg-white px-5 py-2.5 text-sm font-medium text-gray-900 hover:bg-muted disabled:opacity-50 transition-colors"
+            className="cursor-pointer rounded-lg border border-border bg-white px-5 py-2.5 text-sm font-medium text-gray-900 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
           >
             {loading ? "保存中..." : "変更を保存する"}
           </button>
@@ -209,22 +424,136 @@ export function CalendarEditForm({
   );
 }
 
-function Field({
+function inputClass(error?: string) {
+  return `w-full rounded-lg border px-3 py-2 text-sm ${
+    error ? "border-red-500" : "border-border"
+  }`;
+}
+
+function OptionalCheckboxField({
+  id,
+  enabled,
+  onEnabledChange,
   label,
-  required,
+  error,
   children,
 }: {
+  id: string;
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
   label: string;
-  required?: boolean;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
-    <label className="block space-y-1">
-      <span className="text-sm font-medium">
-        {label}
-        {required && <span className="text-red-500 ml-0.5">*</span>}
+    <div>
+      <div className="h-5 flex items-center">
+        <StyledCheckbox
+          id={id}
+          checked={enabled}
+          onChange={onEnabledChange}
+          label={label}
+        />
+      </div>
+      <div
+        className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+          enabled ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+        aria-hidden={!enabled}
+      >
+        <div className="overflow-hidden">
+          <div className="space-y-2 pt-2">
+            {enabled ? children : null}
+            {enabled && error && <p className="text-sm text-red-600">{error}</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StyledCheckbox({
+  id,
+  checked,
+  onChange,
+  label,
+}: {
+  id: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      id={id}
+      role="checkbox"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="flex items-center gap-2.5 cursor-pointer select-none text-left border-0 bg-transparent p-0 m-0 outline-none focus-visible:ring-2 focus-visible:ring-primary/30 rounded-sm"
+    >
+      <span
+        className={`relative flex h-4 w-4 shrink-0 items-center justify-center rounded border box-border transition-colors ${
+          checked ? "border-primary bg-primary" : "border-gray-300 bg-white"
+        }`}
+      >
+        <svg
+          viewBox="0 0 12 12"
+          fill="none"
+          className={`h-2.5 w-2.5 text-white transition-opacity ${
+            checked ? "opacity-100" : "opacity-0"
+          }`}
+          aria-hidden
+        >
+          <path
+            d="M2 6.5 4.5 9 10 3"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
       </span>
-      {children}
-    </label>
+      <span className="text-sm leading-none text-gray-800">{label}</span>
+    </button>
+  );
+}
+
+function DurationSelectField({
+  id,
+  mode,
+  minutes,
+  customValue,
+  error,
+  onSelectPreset,
+  onSelectCustom,
+  onCustomChange,
+}: {
+  id: string;
+  mode: PresetMode;
+  minutes: number;
+  customValue: string;
+  error?: string;
+  onSelectPreset: (minutes: number) => void;
+  onSelectCustom: () => void;
+  onCustomChange: (value: string) => void;
+}) {
+  return (
+    <PresetSelectField
+      id={id}
+      options={DURATION_OPTIONS}
+      mode={mode}
+      presetValue={minutes}
+      customValue={customValue}
+      error={error}
+      customUnit="分"
+      customPlaceholder="分数を入力"
+      customMin={5}
+      customMax={480}
+      formatCustomSelected={(value) => `${value} 分`}
+      onSelectPreset={onSelectPreset}
+      onSelectCustom={onSelectCustom}
+      onCustomChange={onCustomChange}
+    />
   );
 }

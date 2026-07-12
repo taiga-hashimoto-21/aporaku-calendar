@@ -39,7 +39,6 @@ export default async function AccountCalendarPage() {
 
   const googleConnected = Boolean(googleAccount);
   const calendarId = googleConnection?.calendarId ?? "primary";
-  const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3002";
 
   return (
     <AccountSettingsSection title="連携カレンダー">
@@ -98,7 +97,7 @@ export default async function AccountCalendarPage() {
                   <div className="min-w-0">
                     <p className="font-medium text-sm">{cal.name}</p>
                     <p className="text-xs text-gray-500 truncate mt-0.5">
-                      {buildPublicCalendarUrl(cal.slug, baseUrl)}
+                      {buildPublicCalendarUrl(cal.slug)}
                     </p>
                     <p className="text-xs text-gray-400 mt-1">
                       {cal.durationMinutes}分 ·{" "}

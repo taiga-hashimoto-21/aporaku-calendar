@@ -1,12 +1,18 @@
 const FORM_LABEL_CLASS = "text-sm font-medium text-gray-700 pt-2";
 const WEEKDAY_SHORT = ["月", "火", "水", "木", "金", "土", "日"] as const;
 
-/** /calendars/new のデータ待ち。固定ラベル・ボタンは実表示 */
-export function CalendarCreatePageSkeleton() {
+/** /calendars/new・edit のデータ待ち。固定ラベル・ボタンは実表示 */
+export function CalendarCreatePageSkeleton({
+  title = "カレンダー作成",
+  submitLabel = "作成する",
+}: {
+  title?: string;
+  submitLabel?: string;
+} = {}) {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">カレンダー作成</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
       </div>
 
       <div className="space-y-8">
@@ -57,6 +63,26 @@ export function CalendarCreatePageSkeleton() {
             </div>
 
             <div className="grid grid-cols-[8.5rem_1fr] items-start gap-x-4 px-6 py-5">
+              <span className={FORM_LABEL_CLASS}>Web会議設定</span>
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600">
+                  日程調整完了時に Web 会議 URL の発行を自動で行います。
+                </p>
+                <div className="inline-flex rounded-lg border border-border p-0.5">
+                  <span className="rounded-md px-4 py-2 text-sm font-medium bg-primary-light text-primary">
+                    利用しない
+                  </span>
+                  <span className="rounded-md px-4 py-2 text-sm font-medium text-gray-700">
+                    Zoom
+                  </span>
+                  <span className="rounded-md px-4 py-2 text-sm font-medium text-gray-700">
+                    Google Meet
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[8.5rem_1fr] items-start gap-x-4 px-6 py-5">
               <span className={FORM_LABEL_CLASS}>日程候補設定</span>
               <div className="space-y-8">
                 <section className="space-y-3">
@@ -95,7 +121,7 @@ export function CalendarCreatePageSkeleton() {
 
         <div className="flex justify-center pt-2">
           <span className="rounded-lg border border-border bg-white px-5 py-2.5 text-sm font-medium text-gray-900">
-            作成する
+            {submitLabel}
           </span>
         </div>
       </div>

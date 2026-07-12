@@ -474,6 +474,7 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
               <MiniCalendar
                 displayMonth={displayMonth}
                 selectedDate={viewStartDate}
+                timezone={timezone}
                 availability={monthAvailability}
                 monthLoaded={
                   monthAvailabilityKey === `${displayMonth.year}-${displayMonth.month}`
@@ -624,12 +625,9 @@ function BookingModal({
           </div>
 
           {showGoogleMeet && (
-            <div className="mt-6 flex items-start gap-3">
-              <GoogleMeetIcon />
-              <p className="text-sm leading-6 text-[#1f1f1f]">
-                予約後に Google Meet ビデオ会議の情報が追加されます
-              </p>
-            </div>
+            <p className="mt-6 text-sm leading-6 text-[#1f1f1f]">
+              予約後に Google Meet ビデオ会議の情報が追加されます
+            </p>
           )}
 
           <div className="my-6 h-px bg-[#c4c7c5]" />
@@ -873,19 +871,6 @@ function BookingField({
   );
 }
 
-function GoogleMeetIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="mt-0.5 h-5 w-5 shrink-0" aria-hidden>
-      <path
-        fill="#00832D"
-        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"
-      />
-      <rect x="7" y="7" width="10" height="10" rx="2" fill="#fff" />
-      <path fill="#00832D" d="M9.5 10.5 11 13l1.5-2.5H14v5h-1.2v-3.1L11 13.8 9.2 12.4V15.5H8v-5h1.5z" />
-    </svg>
-  );
-}
-
 function ContactCardIcon() {
   return (
     <svg viewBox="0 0 24 24" className="h-5 w-5 text-[#444746]" fill="none" aria-hidden>
@@ -899,6 +884,7 @@ function ContactCardIcon() {
 function MiniCalendar({
   displayMonth,
   selectedDate,
+  timezone,
   availability,
   monthLoaded,
   bookingWindowEnd,
@@ -909,6 +895,7 @@ function MiniCalendar({
 }: {
   displayMonth: { year: number; month: number };
   selectedDate: string;
+  timezone: string;
   availability: Set<string>;
   monthLoaded: boolean;
   bookingWindowEnd: string;
@@ -918,6 +905,7 @@ function MiniCalendar({
   isDateSelectable: (dateKey: string) => boolean;
 }) {
   const monthLabel = `${displayMonth.year}年 ${displayMonth.month}月`;
+  const today = todayDateKey(timezone);
 
   const cells = getMonthGrid(displayMonth.year, displayMonth.month);
   // 翌月1日が受付期間内なら進める（月末が期間外でも月初が有効なら表示する）
@@ -934,7 +922,7 @@ function MiniCalendar({
             type="button"
             aria-label="前の月"
             onClick={onPrevMonth}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100"
+            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-gray-600 hover:bg-gray-100"
           >
             <ChevronLeftIcon className="h-4 w-4" />
           </button>
@@ -943,7 +931,7 @@ function MiniCalendar({
             aria-label="次の月"
             onClick={onNextMonth}
             disabled={!canGoNext}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ChevronRightIcon className="h-4 w-4" />
           </button>
@@ -963,6 +951,7 @@ function MiniCalendar({
         {cells.map((cell) => {
           const inWindow = isDateSelectable(cell.dateKey);
           const hasSlots = availability.has(cell.dateKey);
+          const isToday = cell.dateKey === today;
           const isSelected = cell.dateKey === selectedDate;
           const isUnavailable =
             !inWindow || (monthLoaded && inWindow && !hasSlots);
@@ -974,16 +963,30 @@ function MiniCalendar({
                 type="button"
                 onClick={() => onSelectDate(cell.dateKey)}
                 className={`relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-full text-[10px] font-normal leading-none ${
-                  isSelected
+                  isToday
                     ? "bg-[var(--gm3-sys-color-primary)] text-white"
-                    : isBookable
-                      ? "bg-[var(--gm3-sys-color-primary-container)] text-[#1f1f1f] hover:bg-[#B1D8EF]"
-                      : isUnavailable
-                        ? "text-[#1f1f1f] hover:bg-[#ECEDEF]"
-                        : "text-[#1f1f1f] hover:bg-gray-100"
+                    : isSelected && isBookable
+                      ? "bg-[#B1D8EF] text-[#1f1f1f]"
+                      : isSelected && isUnavailable
+                        ? "bg-[#ECEDEF] text-[#1f1f1f]"
+                      : isSelected
+                        ? "bg-gray-100 text-[#1f1f1f]"
+                      : isBookable
+                        ? "bg-[var(--gm3-sys-color-primary-container)] text-[#1f1f1f] hover:bg-[#B1D8EF]"
+                        : isUnavailable
+                          ? "text-[#1f1f1f] hover:bg-[#ECEDEF]"
+                          : "text-[#1f1f1f] hover:bg-gray-100"
                 }`}
               >
-                <span className={isUnavailable ? "line-through decoration-gray-500" : ""}>
+                <span
+                  className={
+                    isUnavailable
+                      ? isToday
+                        ? "line-through decoration-white"
+                        : "line-through decoration-gray-500"
+                      : ""
+                  }
+                >
                   {cell.day}
                 </span>
               </button>
@@ -1018,58 +1021,65 @@ function WeekSlotGrid({
 }) {
   return (
     <div className="relative w-full overflow-visible">
-      <div className="relative mb-3">
-        <div className="grid w-full grid-cols-7 gap-2 sm:gap-3">
-          {dates.map((dateKey) => {
-            const weekday = new Intl.DateTimeFormat("ja-JP", {
-              weekday: "short",
-              timeZone: timezone,
-            }).format(parseDateKey(dateKey, timezone));
-            const dayNumber = new Intl.DateTimeFormat("ja-JP", {
-              day: "numeric",
-              timeZone: timezone,
-            }).format(parseDateKey(dateKey, timezone));
+      <button
+        type="button"
+        aria-label="前の週"
+        onClick={onPrevWeek}
+        disabled={!canGoPrev}
+        className="absolute top-8 left-0 z-10 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <ChevronLeftIcon className="h-5 w-5" />
+      </button>
 
-            return (
-              <div key={`${dateKey}-header`} className="min-w-0">
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-xs font-medium text-gray-600">{weekday}</span>
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full text-lg font-normal text-gray-900">
-                    {dayNumber}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        <button
-          type="button"
-          aria-label="前の週"
-          onClick={onPrevWeek}
-          disabled={!canGoPrev}
-          className="absolute top-1/2 left-0 z-10 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <ChevronLeftIcon className="h-5 w-5" />
-        </button>
-
-        <button
-          type="button"
-          aria-label="次の週"
-          onClick={onNextWeek}
-          disabled={!canGoNext}
-          className="absolute top-1/2 right-0 z-10 flex h-10 w-10 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <ChevronRightIcon className="h-5 w-5" />
-        </button>
-      </div>
+      <button
+        type="button"
+        aria-label="次の週"
+        onClick={onNextWeek}
+        disabled={!canGoNext}
+        className="absolute top-8 right-0 z-10 flex h-10 w-10 translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <ChevronRightIcon className="h-5 w-5" />
+      </button>
 
       <div className="grid w-full grid-cols-7 gap-2 sm:gap-3">
         {dates.map((dateKey) => {
+          const isToday = dateKey === todayDateKey(timezone);
+          const weekday = new Intl.DateTimeFormat("ja-JP", {
+            weekday: "short",
+            timeZone: timezone,
+          }).format(parseDateKey(dateKey, timezone));
+          const dayNumber =
+            new Intl.DateTimeFormat("ja-JP", {
+              day: "numeric",
+              timeZone: timezone,
+            })
+              .formatToParts(parseDateKey(dateKey, timezone))
+              .find((part) => part.type === "day")?.value ?? "";
           const slots = slotsByDate[dateKey] ?? [];
 
           return (
             <div key={dateKey} className="min-w-0">
+              <div className="mb-3 flex h-14 items-start justify-center">
+                <div
+                  className={`flex h-14 w-14 flex-col items-center justify-center rounded-full ${
+                    isToday
+                      ? "bg-[var(--gm3-sys-color-primary)] text-white"
+                      : "text-gray-900"
+                  }`}
+                >
+                  <span
+                    className={`text-[10px] font-medium leading-none ${
+                      isToday ? "text-white" : "text-gray-600"
+                    }`}
+                  >
+                    {weekday}
+                  </span>
+                  <span className="mt-1.5 text-[22px] font-normal leading-none">
+                    {dayNumber}
+                  </span>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 {Array.from({ length: maxRows }, (_, rowIndex) => {
                   const slot = slots[rowIndex];

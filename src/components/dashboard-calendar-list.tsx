@@ -12,6 +12,29 @@ type CalendarListItem = {
   isActive: boolean;
 };
 
+function formatMeetingTypeLabel(meetingType: string): string {
+  switch (meetingType) {
+    case "google_meet":
+      return "Google Meet";
+    case "zoom":
+      return "Zoom";
+    case "none":
+    default:
+      return "リンクなし";
+  }
+}
+
+function formatCalendarMeta(cal: CalendarListItem): string {
+  const parts = [
+    `${cal.durationMinutes}分`,
+    formatMeetingTypeLabel(cal.meetingType),
+  ];
+  if (!cal.isActive) {
+    parts.push("非公開");
+  }
+  return parts.join(" / ");
+}
+
 export function DashboardCalendarList({ calendars }: { calendars: CalendarListItem[] }) {
   return (
     <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
@@ -20,15 +43,11 @@ export function DashboardCalendarList({ calendars }: { calendars: CalendarListIt
           <div className="min-w-0 flex-1 space-y-1">
             <p className="text-sm font-medium text-gray-900">{cal.name}</p>
             <CalendarShareLink url={cal.publicUrl} variant="compact" />
-            <p className="text-xs text-gray-400">
-              {cal.durationMinutes}分 ·{" "}
-              {cal.meetingType === "none" ? "対面/なし" : cal.meetingType}
-              {!cal.isActive && " · 非公開"}
-            </p>
+            <p className="text-xs text-gray-500">{formatCalendarMeta(cal)}</p>
           </div>
           <Link
             to={`/calendars/${cal.id}/edit`}
-            className="shrink-0 text-sm text-primary hover:underline"
+            className="shrink-0 cursor-pointer text-sm text-primary hover:underline"
           >
             編集
           </Link>

@@ -1,7 +1,7 @@
 "use client";
 
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CalendarShareLink } from "@/components/calendar-share-link";
 import { PresetSelectField } from "@/components/preset-select-field";
 import {
@@ -27,6 +27,14 @@ const DURATION_OPTIONS = [
   { value: 90, label: "1.5 時間" },
   { value: 120, label: "2 時間" },
 ] as const;
+
+type MeetingTypeValue = "none" | "zoom" | "google_meet";
+
+const MEETING_TYPE_OPTIONS: Array<{ value: MeetingTypeValue; label: string }> = [
+  { value: "none", label: "利用しない" },
+  { value: "zoom", label: "Zoom" },
+  { value: "google_meet", label: "Google Meet" },
+];
 
 type IssuedCalendarLink = {
   id: string;
@@ -77,6 +85,40 @@ export function CalendarCreateForm({
       mode: "all",
       participantIds: [currentUserId],
     });
+  const [meetingType, setMeetingType] = useState<MeetingTypeValue>("none");
+  const [zoomConnected, setZoomConnected] = useState<boolean | null>(null);
+
+  const loadZoomConnection = useCallback(async () => {
+    try {
+      const res = await fetch("/api/account/integrations", { credentials: "include" });
+      if (!res.ok) return;
+      const data = (await res.json()) as { zoomConnected?: boolean };
+      setZoomConnected(Boolean(data.zoomConnected));
+    } catch {
+      // 連携状態の取得失敗時は警告を出さない（作成自体は阻害しない）
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadZoomConnection();
+  }, [loadZoomConnection]);
+
+  useEffect(() => {
+    if (meetingType !== "zoom") return;
+
+    function onVisible() {
+      if (document.visibilityState === "visible") {
+        void loadZoomConnection();
+      }
+    }
+
+    window.addEventListener("focus", onVisible);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onVisible);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [meetingType, loadZoomConnection]);
 
   function validate() {
     const next: Record<string, string> = {};
@@ -138,6 +180,7 @@ export function CalendarCreateForm({
           bookingWindowDays: resolvedSchedule.bookingWindowDays,
           participationMode: participantSettings.mode,
           participantIds,
+          meetingType,
         }),
       });
       const data = await res.json();
@@ -171,13 +214,13 @@ export function CalendarCreateForm({
         <div className="flex flex-wrap justify-center gap-3 pt-2">
           <Link
             to={`/calendars/${issuedLink.id}/edit`}
-            className="rounded-lg border border-border bg-white px-5 py-2.5 text-sm font-medium text-gray-900 hover:bg-muted transition-colors"
+            className="cursor-pointer rounded-lg border border-border bg-white px-5 py-2.5 text-sm font-medium text-gray-900 hover:bg-muted transition-colors"
           >
             設定を続ける
           </Link>
           <Link
             to="/dashboard"
-            className="rounded-lg border border-border bg-white px-5 py-2.5 text-sm font-medium text-gray-900 hover:bg-muted transition-colors"
+            className="cursor-pointer rounded-lg border border-border bg-white px-5 py-2.5 text-sm font-medium text-gray-900 hover:bg-muted transition-colors"
           >
             カレンダー一覧へ
           </Link>
@@ -263,6 +306,47 @@ export function CalendarCreateForm({
             </div>
 
             <div className="grid grid-cols-[8.5rem_1fr] items-start gap-x-4 px-6 py-5">
+              <FormLabel>Web会議設定</FormLabel>
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600">
+                  日程調整完了時に Web 会議 URL の発行を自動で行います。
+                </p>
+                <div className="inline-flex rounded-lg border border-border p-0.5">
+                  {MEETING_TYPE_OPTIONS.map((opt) => {
+                    const active = meetingType === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setMeetingType(opt.value)}
+                        className={`cursor-pointer rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                          active
+                            ? "bg-primary-light text-primary"
+                            : "text-gray-700 hover:bg-muted"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {meetingType === "zoom" && zoomConnected === false && (
+                  <p className="text-sm text-gray-600">
+                    参加メンバーはZoomと連携されていません。{" "}
+                    <a
+                      href="/account/integrations"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline underline-offset-2 hover:opacity-80"
+                    >
+                      Zoom連携について
+                    </a>
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[8.5rem_1fr] items-start gap-x-4 px-6 py-5">
               <FormLabel>日程候補設定</FormLabel>
               <div className="space-y-2">
                 <ScheduleCandidateSettings
@@ -281,7 +365,7 @@ export function CalendarCreateForm({
           <button
             type="submit"
             disabled={loading}
-            className="rounded-lg border border-border bg-white px-5 py-2.5 text-sm font-medium text-gray-900 hover:bg-muted disabled:opacity-50 transition-colors"
+            className="cursor-pointer rounded-lg border border-border bg-white px-5 py-2.5 text-sm font-medium text-gray-900 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 transition-colors"
           >
             {loading ? "作成中..." : "作成する"}
           </button>

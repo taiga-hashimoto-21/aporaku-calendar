@@ -43,7 +43,7 @@ export function CalendarShareLink({
         <button
           type="button"
           onClick={handleCopy}
-          className="shrink-0 text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors"
+          className="shrink-0 cursor-pointer text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors"
         >
           {copied ? "コピー済み" : "コピー"}
         </button>
