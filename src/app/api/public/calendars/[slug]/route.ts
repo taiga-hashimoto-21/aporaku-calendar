@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { parseDateKey, todayDateKey } from "@/lib/booking-timezone";
 import { resolvePublicSlug } from "@/lib/delivery-link";
-import {
-  getAvailableSlotsForDateRange,
-  serializePublicCalendarResponse,
-} from "@/lib/calendar-slots";
+import { serializePublicCalendarResponse } from "@/lib/calendar-slots";
+import { getPublicSlots } from "@/lib/slots-cache";
 
+// クリック記録はここでは行わない (月移動のたびに二重計上されるため)。
+// ページ表示時に 1 回だけ POST /api/public/links/[slug]/click で記録する。
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -14,7 +14,7 @@ export async function GET(
   const fromParam = request.nextUrl.searchParams.get("from");
   const daysParam = request.nextUrl.searchParams.get("days");
 
-  const resolved = await resolvePublicSlug(slug, { recordClick: true });
+  const resolved = await resolvePublicSlug(slug);
   if (!resolved) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -38,7 +38,7 @@ export async function GET(
     return NextResponse.json({ error: "Invalid date" }, { status: 400 });
   }
 
-  const slotsByDate = await getAvailableSlotsForDateRange(resolved.calendar, fromDate, days);
+  const slotsByDate = await getPublicSlots(resolved.calendar, fromKey, days);
 
   return NextResponse.json(
     serializePublicCalendarResponse(resolved.calendar, slotsByDate, {

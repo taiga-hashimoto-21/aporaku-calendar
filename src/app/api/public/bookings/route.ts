@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createGoogleCalendarEvent } from "@/lib/google-calendar";
 import { resolvePublicSlug } from "@/lib/delivery-link";
+import { invalidateSlotsCache } from "@/lib/slots-cache";
 import { sendAporakuWebhook } from "@/lib/webhook";
 import { z } from "zod";
 
@@ -99,6 +100,10 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       console.error("Google Calendar event creation failed:", err);
     }
+
+    // 予約が入った枠を次の閲覧者に見せないよう、このカレンダーの空き枠キャッシュを破棄する
+    // (Google イベント作成後に行うことで、再計算時の freebusy に今回の予約が反映される)。
+    await invalidateSlotsCache(calendar.id);
 
     await sendAporakuWebhook(booking);
 

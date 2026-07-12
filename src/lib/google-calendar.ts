@@ -32,14 +32,41 @@ export async function getGoogleBusyIntervals(params: {
   userId: string;
   timeMin: Date;
   timeMax: Date;
+  /** 事前読込済みの Google 認証情報。 渡すと DB 往復 (Account/GoogleConnection) を省略する。 */
+  preloadedAuth?: {
+    account: {
+      refresh_token: string | null;
+      access_token: string | null;
+      expires_at: number | null;
+    } | null;
+    calendarId: string | null;
+  };
 }): Promise<Array<{ start: Date; end: Date }>> {
-  const auth = await getOAuthClient(params.userId);
+  let auth: InstanceType<typeof google.auth.OAuth2>;
+  let calendarId: string;
+  if (params.preloadedAuth) {
+    const account = params.preloadedAuth.account;
+    if (!account?.refresh_token) {
+      throw new Error("Google account not connected");
+    }
+    auth = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
+    );
+    auth.setCredentials({
+      refresh_token: account.refresh_token,
+      access_token: account.access_token ?? undefined,
+      expiry_date: account.expires_at ? account.expires_at * 1000 : undefined,
+    });
+    calendarId = params.preloadedAuth.calendarId ?? "primary";
+  } else {
+    auth = await getOAuthClient(params.userId);
+    const connection = await prisma.googleConnection.findUnique({
+      where: { userId: params.userId },
+    });
+    calendarId = connection?.calendarId ?? "primary";
+  }
   const calendar = google.calendar({ version: "v3", auth });
-
-  const connection = await prisma.googleConnection.findUnique({
-    where: { userId: params.userId },
-  });
-  const calendarId = connection?.calendarId ?? "primary";
 
   const res = await calendar.freebusy.query({
     requestBody: {

@@ -20,6 +20,31 @@ interface BookingForm {
 
 interface PublicCalendarPageProps {
   slug: string;
+  /**
+   * SSR で埋め込む初期データ (今月分の空き枠)。 これがあると初回 fetch を行わず、
+   * サーバーから届いた HTML の時点でカレンダーが完成している (「読み込み中」なし)。
+   */
+  initialData?: InitialBookingData | null;
+}
+
+export interface InitialBookingData {
+  calendar: CalendarInfo;
+  slotsByDate: Record<string, Slot[]>;
+  prefilledCompany?: string | null;
+  from?: string | null;
+  days?: number | null;
+}
+
+/** 初期表示月 (サーバー/クライアントとも Asia/Tokyo 基準で一致させる)。 */
+function currentMonthJst(): { year: number; month: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "numeric",
+  }).formatToParts(new Date());
+  const year = Number(parts.find((p) => p.type === "year")?.value);
+  const month = Number(parts.find((p) => p.type === "month")?.value);
+  return { year, month };
 }
 
 interface Slot {
@@ -66,32 +91,52 @@ function availableDatesFromSlots(slotsByDate: Record<string, Slot[]>): string[] 
   return available;
 }
 
-export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
+export function PublicBookingPage({ slug, initialData }: PublicCalendarPageProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const previewConfirmed = searchParams.get("preview") === "confirmed";
 
-  const [calendar, setCalendar] = useState<CalendarInfo | null>(null);
-  const [slotsByDateCache, setSlotsByDateCache] = useState<Record<string, Slot[]>>({});
-  const slotsByDateCacheRef = useRef<Record<string, Slot[]>>({});
-  const [monthAvailability, setMonthAvailability] = useState<Set<string>>(new Set());
-  const [monthAvailabilityKey, setMonthAvailabilityKey] = useState<string | null>(null);
-  const monthAvailabilityCacheRef = useRef<Record<string, string[]>>({});
-  const activeMonthKeyRef = useRef<string | null>(null);
+  // SSR 初期データがある場合は各 state をそこから初期化する。 これによりサーバーが返す
+  // HTML の時点でカレンダーが描画済みになり、 初回の fetch もローディング表示も発生しない。
+  const hasInitial = !!(initialData && initialData.calendar);
+  const initialMonth = useMemo(() => (hasInitial ? currentMonthJst() : null), [hasInitial]);
+  const initialMonthKey = initialMonth ? `${initialMonth.year}-${initialMonth.month}` : null;
+
+  const [calendar, setCalendar] = useState<CalendarInfo | null>(initialData?.calendar ?? null);
+  const [slotsByDateCache, setSlotsByDateCache] = useState<Record<string, Slot[]>>(
+    initialData?.slotsByDate ?? {}
+  );
+  const slotsByDateCacheRef = useRef<Record<string, Slot[]>>(initialData?.slotsByDate ?? {});
+  const [monthAvailability, setMonthAvailability] = useState<Set<string>>(
+    () => new Set(hasInitial ? availableDatesFromSlots(initialData!.slotsByDate) : [])
+  );
+  const [monthAvailabilityKey, setMonthAvailabilityKey] = useState<string | null>(
+    initialMonthKey
+  );
+  const monthAvailabilityCacheRef = useRef<Record<string, string[]>>(
+    hasInitial && initialMonthKey
+      ? { [initialMonthKey]: availableDatesFromSlots(initialData!.slotsByDate) }
+      : {}
+  );
+  const activeMonthKeyRef = useRef<string | null>(initialMonthKey);
   const pendingRangeFetchesRef = useRef<Set<string>>(new Set());
-  const [viewStartDate, setViewStartDate] = useState<string>("");
-  const [displayMonth, setDisplayMonth] = useState<{ year: number; month: number } | null>(null);
+  const [viewStartDate, setViewStartDate] = useState<string>(
+    hasInitial ? todayDateKey("Asia/Tokyo") : ""
+  );
+  const [displayMonth, setDisplayMonth] = useState<{ year: number; month: number } | null>(
+    initialMonth
+  );
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [confirmedBooking, setConfirmedBooking] = useState<{
     slot: Slot;
     email: string;
   } | null>(null);
   const [previewDismissed, setPreviewDismissed] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(!hasInitial);
   const [step, setStep] = useState<"select" | "done">("select");
   const [form, setForm] = useState<BookingForm>({
-    guestCompany: "",
+    guestCompany: initialData?.prefilledCompany ?? "",
     guestName: "",
     guestPhone: "",
     guestEmail: "",
@@ -137,7 +182,23 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
     []
   );
 
+  // ページ表示のクリック記録 (1回だけ)。 空き枠 API から分離したので月移動では計上されない。
   useEffect(() => {
+    try {
+      const url = `/api/public/links/${encodeURIComponent(slug)}/click`;
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(url);
+      } else {
+        void fetch(url, { method: "POST", keepalive: true });
+      }
+    } catch {
+      /* 記録失敗は無視 */
+    }
+  }, [slug]);
+
+  useEffect(() => {
+    // SSR 初期データ適用済みなら初回 fetch は不要
+    if (hasInitial) return;
     async function loadInitial() {
       setInitialLoading(true);
       setError(null);
@@ -172,7 +233,39 @@ export function PublicBookingPage({ slug }: PublicCalendarPageProps) {
       }
     }
     loadInitial();
-  }, [fetchSlots, mergeSlotsCache, applyMonthAvailability]);
+  }, [hasInitial, fetchSlots, mergeSlotsCache, applyMonthAvailability]);
+
+  // 翌月の空き枠をアイドル時に先読みする (月送りを待たせない)。
+  useEffect(() => {
+    if (!calendar || initialLoading || !displayMonth) return;
+    const timer = setTimeout(() => {
+      const next =
+        displayMonth.month === 12
+          ? { year: displayMonth.year + 1, month: 1 }
+          : { year: displayMonth.year, month: displayMonth.month + 1 };
+      const monthKey = `${next.year}-${next.month}`;
+      if (monthAvailabilityCacheRef.current[monthKey]) return;
+      const range = monthGridRange(next.year, next.month, timezone);
+      if (!range) return;
+      const fetchKey = `prefetch:${range.from}:${range.days}`;
+      if (pendingRangeFetchesRef.current.has(fetchKey)) return;
+      pendingRangeFetchesRef.current.add(fetchKey);
+      fetchSlots(range.from, range.days)
+        .then((data) => {
+          mergeSlotsCache(data.slotsByDate);
+          monthAvailabilityCacheRef.current[monthKey] = availableDatesFromSlots(
+            data.slotsByDate
+          );
+        })
+        .catch(() => {
+          /* 先読み失敗は無視 (月送り時に通常経路で取得される) */
+        })
+        .finally(() => {
+          pendingRangeFetchesRef.current.delete(fetchKey);
+        });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [calendar, initialLoading, displayMonth, timezone, fetchSlots, mergeSlotsCache]);
 
   useEffect(() => {
     if (!displayMonth || !calendar) return;

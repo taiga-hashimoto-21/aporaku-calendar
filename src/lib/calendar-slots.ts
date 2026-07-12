@@ -49,10 +49,20 @@ export async function getAvailableSlotsForDateRange(
   }
 
   try {
+    // resolvePublicSlug が認証情報を同時取得している場合は DB 往復を省く。
+    const account = calendar.user.accounts?.[0] ?? null;
     const busy = await getGoogleBusyIntervals({
       userId: calendar.user.id,
       timeMin: allSlots[0].start,
       timeMax: allSlots[allSlots.length - 1].end,
+      ...(calendar.user.accounts !== undefined
+        ? {
+            preloadedAuth: {
+              account,
+              calendarId: calendar.user.googleConnection?.calendarId ?? null,
+            },
+          }
+        : {}),
     });
 
     for (const dateKey of Object.keys(slotsByDate)) {
@@ -72,7 +82,7 @@ export async function getAvailableSlotsForDateRange(
 
 export function serializePublicCalendarResponse(
   calendar: CalendarWithOwner,
-  slotsByDate: Record<string, Array<{ start: Date; end: Date }>>,
+  serializedByDate: Record<string, Array<{ start: string; end: string }>>,
   extra?: {
     linkKind?: "calendar" | "delivery";
     deliveryLinkSlug?: string;
@@ -81,14 +91,6 @@ export function serializePublicCalendarResponse(
     days?: number;
   }
 ) {
-  const serializedByDate: Record<string, Array<{ start: string; end: string }>> = {};
-  for (const [dateKey, daySlots] of Object.entries(slotsByDate)) {
-    serializedByDate[dateKey] = daySlots.map((slot) => ({
-      start: slot.start.toISOString(),
-      end: slot.end.toISOString(),
-    }));
-  }
-
   const flatSlots = Object.values(serializedByDate).flat();
 
   return {

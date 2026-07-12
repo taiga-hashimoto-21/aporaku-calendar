@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { findAccessibleCalendar } from "@/lib/team";
+import { invalidateSlotsCache } from "@/lib/slots-cache";
 import { buildPublicCalendarUrl } from "@/lib/utils";
 import { z } from "zod";
 
@@ -131,6 +132,9 @@ export async function PATCH(
 
       return updated;
     });
+
+    // 受付時間などの設定変更を公開ページへ即反映するため、空き枠キャッシュを破棄する
+    await invalidateSlotsCache(calendar.id);
 
     return NextResponse.json({ calendar });
   } catch (error) {

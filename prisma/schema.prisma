@@ -367,6 +367,23 @@ model WebhookEndpoint {
 }
 
 // ---------------------------------------------------------------------------
+// 公開ページの空き枠キャッシュ
+//   Google freebusy + スロット計算の結果を (calendarId, fromKey, days) 単位で保持し、
+//   公開ページ表示のたびに Google API を叩かない。 TTL/SWR 判定はコード側 (slots-cache.ts)。
+//   予約成立・カレンダー設定変更時に該当 calendarId を全消しする。
+// ---------------------------------------------------------------------------
+
+model PublicSlotsCache {
+  calendarId String
+  fromKey    String // "YYYY-MM-DD" (カレンダーのタイムゾーン基準)
+  days       Int
+  payload    Json // Record<dateKey, Array<{ start: ISO, end: ISO }>>
+  updatedAt  DateTime @updatedAt
+
+  @@id([calendarId, fromKey, days])
+}
+
+// ---------------------------------------------------------------------------
 // 管理者: 予約完了メール文面（全アカウント共通・プレーンテキスト）
 // ---------------------------------------------------------------------------
 

@@ -3,7 +3,19 @@ import { generateUniqueSlug, buildPublicUrl } from "@/lib/slug";
 import type { DeliveryLink, SchedulingCalendar } from "@prisma/client";
 
 export type CalendarWithOwner = SchedulingCalendar & {
-  user: { id: string; name: string | null; email: string; image: string | null };
+  user: {
+    id: string;
+    name: string | null;
+    email: string;
+    image: string | null;
+    /** Google freebusy 用の認証情報 (公開ページの DB 往復を1回にまとめるため同時取得)。 */
+    accounts?: Array<{
+      refresh_token: string | null;
+      access_token: string | null;
+      expires_at: number | null;
+    }>;
+    googleConnection?: { calendarId: string | null } | null;
+  };
   customFields: Array<{
     id: string;
     label: string;
@@ -20,7 +32,21 @@ export type ResolvedPublicSlug =
 
 const calendarInclude = {
   customFields: { orderBy: { sortOrder: "asc" as const } },
-  user: { select: { id: true, name: true, email: true, image: true } },
+  user: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      image: true,
+      // 公開ページの空き枠計算 (Google freebusy) で使う認証情報を同時に取る。
+      // 別クエリにすると DB 往復が増えて公開ページの TTFB に直結するため。
+      accounts: {
+        where: { provider: "google" },
+        select: { refresh_token: true, access_token: true, expires_at: true },
+      },
+      googleConnection: { select: { calendarId: true } },
+    },
+  },
 };
 
 /**
