@@ -51,10 +51,13 @@ export function MarketingFooter() {
 export function LegalPageShell({
   title,
   description,
+  headerAction,
   children,
 }: {
   title: string;
   description?: string;
+  /** タイトル行右側（言語切替など） */
+  headerAction?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -63,9 +66,14 @@ export function LegalPageShell({
       <main className="flex-1 px-6 py-12">
         <article className="mx-auto max-w-3xl space-y-8">
           <div className="space-y-2">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-              {title}
-            </h1>
+            <div className="flex items-center justify-between gap-4">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight min-w-0">
+                {title}
+              </h1>
+              {headerAction ? (
+                <div className="shrink-0">{headerAction}</div>
+              ) : null}
+            </div>
             <p className="text-sm text-gray-500">
               {description ?? `${SERVICE_NAME} をご利用いただく前にご確認ください。`}
             </p>
@@ -82,13 +90,15 @@ export function LegalPageShell({
 
 export function LegalSection({
   title,
+  id,
   children,
 }: {
   title: string;
+  id?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-3">
+    <section id={id} className="space-y-3 scroll-mt-8">
       <h2 className="text-base font-semibold text-gray-900">{title}</h2>
       <div className="space-y-3">{children}</div>
     </section>

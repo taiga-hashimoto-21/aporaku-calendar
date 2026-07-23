@@ -16,8 +16,13 @@ export function ProtectedRoute() {
   useEffect(() => {
     if (loading || authenticated || loginRedirectedRef.current) return;
     loginRedirectedRef.current = true;
-    window.location.replace("/login");
-  }, [loading, authenticated]);
+    const callback = `${location.pathname}${location.search}`;
+    const loginUrl =
+      callback.startsWith("/") && !callback.startsWith("//")
+        ? `/login?callbackUrl=${encodeURIComponent(callback)}`
+        : "/login";
+    window.location.replace(loginUrl);
+  }, [loading, authenticated, location.pathname, location.search]);
 
   useEffect(() => {
     if (loading || !authenticated) return;
@@ -40,8 +45,11 @@ export function ProtectedRoute() {
     navigate,
   ]);
 
-  if (loading || !authenticated) {
-    return <DashboardFrameSkeleton />;
+  // 未ログインは middleware で /login へ送る。ここは Cookie 切れ等のフォールバック。
+  // 未ログイン確定後はスケルトンを出さず、リダイレクトまで何も描画しない。
+  if (!authenticated) {
+    if (loading) return <DashboardFrameSkeleton />;
+    return null;
   }
 
   if (needsCompanyOnboarding && !isOnboardingPath) {

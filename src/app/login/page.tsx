@@ -1,7 +1,21 @@
 import Link from "next/link";
 import { GoogleAuthButton } from "@/components/google-auth-button";
 
-export default function LoginPage() {
+function resolveCallbackUrl(raw: string | string[] | undefined): string {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value) return "/dashboard";
+  if (!value.startsWith("/") || value.startsWith("//")) return "/dashboard";
+  return value;
+}
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const callbackUrl = resolveCallbackUrl(params.callbackUrl);
+
   return (
     <main className="min-h-screen flex flex-col">
       <header className="border-b border-border">
@@ -24,7 +38,7 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <GoogleAuthButton label="Google でログイン" />
+          <GoogleAuthButton label="Google でログイン" redirectTo={callbackUrl} />
 
           <p className="text-xs text-gray-400 text-center">
             アカウントをお持ちでない方は{" "}
