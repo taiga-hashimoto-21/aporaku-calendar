@@ -114,9 +114,14 @@ export async function createGoogleCalendarEvent(params: {
     };
   } = {
     summary: `${params.calendar.name} - ${params.guestName}`,
-    description: params.booking.guestCompany
-      ? `会社: ${params.booking.guestCompany}`
-      : undefined,
+    description: [
+      params.booking.guestCompany ? `会社: ${params.booking.guestCompany}` : null,
+      params.booking.zoomMeetingUrl
+        ? `Zoom: ${params.booking.zoomMeetingUrl}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join("\n") || undefined,
     start: {
       dateTime: params.booking.startAt.toISOString(),
       timeZone: params.calendar.timezone,

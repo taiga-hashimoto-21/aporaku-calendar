@@ -4,6 +4,7 @@ import { createGoogleCalendarEvent } from "@/lib/google-calendar";
 import { resolvePublicSlug } from "@/lib/delivery-link";
 import { invalidateSlotsCache } from "@/lib/slots-cache";
 import { sendAporakuWebhook } from "@/lib/webhook";
+import { createZoomMeeting } from "@/lib/zoom";
 import { z } from "zod";
 
 const bookingSchema = z.object({
@@ -75,6 +76,41 @@ export async function POST(request: NextRequest) {
         where: { id: deliveryLink.id },
         data: { bookedAt: new Date() },
       });
+    }
+
+    // Zoom カレンダーの場合、予約確定時にミーティングを発行して join URL を保存する
+    if (calendar.meetingType === "zoom") {
+      try {
+        const zoomMeeting = await createZoomMeeting(calendar.user.id, {
+          topic: `${calendar.name} - ${parsed.guestName}`,
+          startTimeIso: booking.startAt.toISOString(),
+          durationMinutes: calendar.durationMinutes,
+          timezone: calendar.timezone,
+          agenda: [
+            parsed.guestCompany ? `Company: ${parsed.guestCompany}` : null,
+            `Guest: ${parsed.guestName} <${parsed.guestEmail}>`,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        });
+
+        if (zoomMeeting) {
+          const updated = await prisma.booking.update({
+            where: { id: booking.id },
+            data: {
+              zoomMeetingId: zoomMeeting.id,
+              zoomMeetingUrl: zoomMeeting.joinUrl,
+            },
+            include: {
+              calendar: true,
+              deliveryLink: true,
+            },
+          });
+          Object.assign(booking, updated);
+        }
+      } catch (err) {
+        console.error("Zoom meeting creation failed:", err);
+      }
     }
 
     try {

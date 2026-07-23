@@ -36,6 +36,12 @@ export function MarketingFooter() {
           <Link href="/docs/zoom" className="hover:text-gray-900 transition-colors">
             Zoom連携ガイド
           </Link>
+          <Link
+            href="/docs/zoom-test-plan"
+            className="hover:text-gray-900 transition-colors"
+          >
+            Zoom Test Plan
+          </Link>
           <Link href="/terms" className="hover:text-gray-900 transition-colors">
             利用規約
           </Link>
